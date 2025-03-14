@@ -228,3 +228,38 @@ class CumulativePowerConsumption(Property):
             raise NotImplementedError()
 
         return result
+
+
+@dataclass
+class ManufacturerErrorCode(Property):
+    """メーカ異常コード(0x86)"""
+
+    size: int = 0
+    """異常コード部のデータサイズ"""
+    manufactor_code: int = 0
+    """メーカーコード"""
+    error_code: bytes = b""
+    """異常コード部"""
+
+    def __post_init__(self):
+        self.code = 0x86
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        size = data[0]
+        manufactor_code = int.from_bytes(data[1:4], byteorder="big")
+        error_code = data[4:]
+        return cls(size, manufactor_code, error_code)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result

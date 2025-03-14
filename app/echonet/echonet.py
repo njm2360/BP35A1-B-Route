@@ -12,6 +12,7 @@ from app.echonet.property.base_property import (
     IdentifierNo,
     InstallLocation,
     InstantPowerConsumption,
+    ManufacturerErrorCode,
     OpStatus,
     Property,
     VersionInfo,
@@ -46,7 +47,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x85:  # 積算消費電力量計測値
             return CumulativePowerConsumption.decode
         case 0x86:  # メーカ異常コード
-            pass  # return ManufacturerErrorCode()
+            return ManufacturerErrorCode.decode
         case 0x87:  # 電流制限設定
             pass  # return CurrentLimitSetting()
         case 0x88:  # 異常発生状態
