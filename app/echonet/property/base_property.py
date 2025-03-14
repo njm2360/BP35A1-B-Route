@@ -110,3 +110,35 @@ class InstallLocation(Property):
                 result.append(self._location & 0xFF)
 
         return result
+
+
+@dataclass
+class VersionInfo(Property):
+    """規格Version情報(0x82)"""
+
+    release: str = ""
+    """リリース"""
+    rev_no: int = 0
+    """リビジョン番号"""
+
+    def __post_init__(self):
+        self.code = 0x82
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        release = chr(data[2])
+        rev_no = data[3]
+        return cls(release, rev_no)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
