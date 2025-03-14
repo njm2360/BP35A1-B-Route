@@ -1,5 +1,7 @@
+from enum import IntEnum
 from dataclasses import dataclass
 from typing import Optional, Union
+from datetime import date, datetime, time
 
 from app.echonet.property.install_location import LocationCode, SpecialLocationCode
 from app.echonet.property.property import Property
@@ -22,9 +24,7 @@ class OpStatus(Property):
         return cls(status=data[0] == 0x30)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -132,9 +132,7 @@ class VersionInfo(Property):
         return cls(release, rev_no)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -160,9 +158,7 @@ class IdentifierNo(Property):
         raise NotImplementedError()
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -189,9 +185,7 @@ class InstantPowerConsumption(Property):
         return cls(value)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -218,9 +212,7 @@ class CumulativePowerConsumption(Property):
         return cls(value)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -253,9 +245,7 @@ class ManufacturerErrorCode(Property):
         return cls(size, manufactor_code, error_code)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -282,9 +272,7 @@ class CurrentLimitSetting(Property):
         return cls(value)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
-
-        result.append(self.code)
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)
@@ -311,9 +299,333 @@ class AbnormalState(Property):
         return cls(status)
 
     def encode(self, mode: Access) -> list[int]:
-        result: list[int] = []
+        result: list[int] = [self.code]
 
-        result.append(self.code)
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class MemberID(Property):
+    """会員ID／メーカコード(0x8A)"""
+
+    manufactor_code: int = 0
+    """コード"""
+
+    def __post_init__(self):
+        self.code = 0x8A
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        manufactor_code = int.from_bytes(data, byteorder="big")
+        return cls(manufactor_code)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class BusinessCode(Property):
+    """事業場コード(0x8B)"""
+
+    business_code: int = 0
+    """コード"""
+
+    def __post_init__(self):
+        self.code = 0x8B
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        business_code = int.from_bytes(data, byteorder="big")
+        return cls(business_code)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class ProductCode(Property):
+    """商品コード(0x8C)"""
+
+    product_code: str = ""
+    """コード"""
+
+    def __post_init__(self):
+        self.code = 0x8C
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        product_code = data.decode()
+        return cls(product_code)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class SerialNumber(Property):
+    """製造番号(0x8D)"""
+
+    value: str = ""
+    """コード"""
+
+    def __post_init__(self):
+        self.code = 0x8D
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = data.decode()
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class ManufactureDate(Property):
+    """製造年月日(0x8E)"""
+
+    value: datetime = None
+    """製造年月日"""
+
+    def __post_init__(self):
+        self.code = 0x8E
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        year = int.from_bytes(data[0:2], byteorder="big")
+        month = data[2]
+        day = data[3]
+        return cls(value=datetime(year, month, day))
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class PowerSavingMode(Property):
+    """節電動作設定(0x8F)"""
+
+    class State(IntEnum):
+        POWER_SAVE_OP = 0x41  # 節電動作中
+        NORMAL_OP = 0x42  # 通常動作中
+
+    state: State = None
+    """状態"""
+
+    def __post_init__(self):
+        self.code = 0x8F
+        self.accessRules = [Access.GET, Access.SET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        state = cls.State(data[0])
+        return cls(state)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            result.append(0x01)
+            result.append(self.state.value)
+
+        return result
+
+
+@dataclass
+class RemoteControlSetting(Property):
+    """遠隔操作設定(0x93)"""
+
+    class State(IntEnum):
+        PUBLIC_LINE_UNUSED = 0x41  # 公衆回線未経由操作
+        PUBLIC_LINE_USED = 0x42  # 公衆回線経由操作
+        LINE_NORMAL_NO_PUBLIC = 0x61  # 通信回線正常（公衆回線経由の操作不可）
+        LINE_NORMAL_WITH_PUBLIC = 0x62  # 通信回線正常（公衆回線経由の操作可能）
+
+    state: State = None
+    """状態"""
+
+    def __post_init__(self):
+        self.code = 0x93
+        self.accessRules = [Access.GET, Access.SET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        state = cls.State(data[0])
+        return cls(state)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            result.append(0x01)
+            result.append(self.state.value)
+
+        return result
+
+
+@dataclass
+class CurrentTime(Property):
+    """現在時刻設定(0x97)"""
+
+    value: time = None
+    """値"""
+
+    def __post_init__(self):
+        self.code = 0x97
+        self.accessRules = [Access.GET, Access.SET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = time(data[0], data[1])
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            result.append(0x02)
+            result.append(self.value.hour)
+            result.append(self.value.minute)
+
+        return result
+
+
+@dataclass
+class CurrentDate(Property):
+    """現在年月日設定(0x98)"""
+
+    value: date = None
+    """値"""
+
+    def __post_init__(self):
+        self.code = 0x98
+        self.accessRules = [Access.GET, Access.SET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = date(int.from_bytes(data[0:2], byteorder="big"), data[2], data[3])
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            result.append(0x04)
+            result.extend(self.value.year.to_bytes(2, byteorder="big"))
+            result.append(self.value.month)
+            result.append(self.value.day)
+
+        return result
+
+
+@dataclass
+class PowerLimitSetting(Property):
+    """電力制限設定(0x99)"""
+
+    value: int = 0
+    """制限値(W)"""
+
+    def __post_init__(self):
+        self.code = 0x99
+        self.accessRules = [Access.GET, Access.SET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = int.from_bytes(data, byteorder="big")
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            result.append(0x02)
+            result.extend(self.value.to_bytes(2, byteorder="big"))
+
+        return result
+
+
+@dataclass
+class CumulativeOperatingTime(Property):
+    """積算運転時間(0x9A)"""
+
+    class Unit(IntEnum):
+        SECOND = 0x41
+        MINUTE = 0x42
+        HOUR = 0x43
+        DAY = 0x44
+
+    unit: Unit = None
+    """単位"""
+    value: int = 0
+    """積算運転時間"""
+
+    def __post_init__(self):
+        self.code = 0x9A
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        unit = cls.Unit(data[0])
+        value = int.from_bytes(data[1:5], byteorder="big")
+        return cls(unit, value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
 
         if mode == Access.GET:
             result.append(0x00)

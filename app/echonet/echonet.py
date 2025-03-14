@@ -9,14 +9,24 @@ from app.echonet.protocol.access import Access
 
 from app.echonet.property.base_property import (
     AbnormalState,
+    BusinessCode,
+    CumulativeOperatingTime,
     CumulativePowerConsumption,
+    CurrentDate,
     CurrentLimitSetting,
-    IdentifierNo,
+    CurrentTime,
     InstallLocation,
     InstantPowerConsumption,
+    ManufactureDate,
     ManufacturerErrorCode,
+    MemberID,
     OpStatus,
+    PowerLimitSetting,
+    PowerSavingMode,
+    ProductCode,
     Property,
+    RemoteControlSetting,
+    SerialNumber,
     VersionInfo,
 )
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
@@ -55,29 +65,29 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x88:  # 異常発生状態
             return AbnormalState.decode
         case 0x89:  # 異常内容
-            pass  # return AbnormalContent()
+            pass  # return AbnormalContent.decode # 複雑なので保留
         case 0x8A:  # 会員ID／メーカコード
-            pass  # return MemberID()
+            return MemberID.decode
         case 0x8B:  # 事業場コード
-            pass  # return BusinessCode()
+            return BusinessCode.decode
         case 0x8C:  # 商品コード
-            pass  # return ProductCode()
+            return ProductCode.decode
         case 0x8D:  # 製造番号
-            pass  # return SerialNumber()
+            return SerialNumber.decode
         case 0x8E:  # 製造年月日
-            pass  # return ManufactureDate()
+            return ManufactureDate.decode
         case 0x8F:  # 節電動作設定
-            pass  # return PowerSavingMode()
+            return PowerSavingMode.decode
         case 0x93:  # 遠隔操作設定
-            pass  # return RemoteControlSetting()
+            return RemoteControlSetting.decode
         case 0x97:  # 現在時刻設定
-            pass  # return CurrentTime()
+            return CurrentTime.decode
         case 0x98:  # 現在年月日設定
-            pass  # return CurrentDate()
+            return CurrentDate.decode
         case 0x99:  # 電力制限設定
-            pass  # return PowerLimitSetting()
+            return PowerLimitSetting.decode
         case 0x9A:  # 積算運転時間
-            pass  # return CumulativeOperatingTime()
+            return CumulativeOperatingTime.decode
         case 0x9B:  # Setプロパティマップ
             pass  # return SetPropertyMap()
         case 0x9C:  # Getプロパティマップ
