@@ -142,3 +142,30 @@ class VersionInfo(Property):
             raise NotImplementedError()
 
         return result
+
+@dataclass
+class IdentifierNo(Property):
+    """識別番号(0x83)"""
+
+    # low_layer_id: int = 0
+    # """下位通信層ID"""
+
+    def __post_init__(self):
+        self.code = 0x83
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        raise NotImplementedError()
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
