@@ -10,11 +10,14 @@ from app.echonet.protocol.access import Access
 from app.echonet.property.base_property import (
     AbnormalState,
     BusinessCode,
+    ChangeAnnoPropertyMap,
     CumulativeOperatingTime,
     CumulativePowerConsumption,
     CurrentDate,
     CurrentLimitSetting,
     CurrentTime,
+    GetMPropertyMap,
+    GetPropertyMap,
     InstallLocation,
     InstantPowerConsumption,
     ManufactureDate,
@@ -27,6 +30,8 @@ from app.echonet.property.base_property import (
     Property,
     RemoteControlSetting,
     SerialNumber,
+    SetMPropertyMap,
+    SetPropertyMap,
     VersionInfo,
 )
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
@@ -88,16 +93,16 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
             return PowerLimitSetting.decode
         case 0x9A:  # 積算運転時間
             return CumulativeOperatingTime.decode
-        case 0x9B:  # Setプロパティマップ
-            pass  # return SetPropertyMap()
-        case 0x9C:  # Getプロパティマップ
-            pass  # return GetPropertyMap()
+        case 0x9B:  # SetMプロパティマップ
+            return SetMPropertyMap.decode
+        case 0x9C:  # GetMプロパティマップ
+            return GetMPropertyMap.decode
         case 0x9D:  # 状変アナウンスプロパティマップ
-            pass  # return StatusChangeAnnouncementPropertyMap()
+            return ChangeAnnoPropertyMap.decode
         case 0x9E:  # Setプロパティマップ
-            pass  # return SetPropertyMap()
+            return SetPropertyMap.decode
         case 0x9F:  # Getプロパティマップ
-            pass  # return GetPropertyMap()
+            return GetPropertyMap.decode
 
     match src.classGroupCode:
         case ClassGroupCode.SensorDevice:
@@ -255,7 +260,7 @@ class ProtocolRx:
         cls._esv = ESV(data[10])
         cls._opc = data[11]
 
-        print(f"TID: {cls._tid}, ESV: 0x{cls._esv:02x}, OPC: {cls._opc}")
+        # print(f"TID: {cls._tid}, ESV: 0x{cls._esv:02x}, OPC: {cls._opc}")
 
         return cls._parse_properties(data, start_index=12)
 

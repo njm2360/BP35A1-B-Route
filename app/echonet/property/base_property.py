@@ -1,5 +1,5 @@
 from enum import IntEnum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Union
 from datetime import date, datetime, time
 
@@ -376,7 +376,7 @@ class ProductCode(Property):
 
     @classmethod
     def decode(cls, data: bytes):
-        product_code = data.decode()
+        product_code = data.decode().rstrip()
         return cls(product_code)
 
     def encode(self, mode: Access) -> list[int]:
@@ -403,7 +403,7 @@ class SerialNumber(Property):
 
     @classmethod
     def decode(cls, data: bytes):
-        value = data.decode()
+        value = data.decode().rstrip()
         return cls(value)
 
     def encode(self, mode: Access) -> list[int]:
@@ -633,3 +633,83 @@ class CumulativeOperatingTime(Property):
             raise NotImplementedError()
 
         return result
+
+
+@dataclass
+class PropertyMap(Property):
+    count: int = 0
+    """プロパティ数"""
+    epc_list: list[int] = field(default_factory=list)
+    """EPC一覧"""
+
+    @classmethod
+    def decode(cls, data: bytes):
+        count = data[0]
+
+        if count < 16:
+            epc_list = list(data[1:])
+        else:
+            epc_list = []
+            for byte_index in range(16):
+                byte_value = data[byte_index + 1]
+                for bit_index in range(8):
+                    if (byte_value >> (7 - bit_index)) & 1:
+                        epc = 0xF0 + byte_index - (bit_index * 0x10)
+                        epc_list.append(epc)
+
+        return cls(count, sorted(epc_list))
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = [self.code]
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class SetMPropertyMap(PropertyMap):
+    """SetMプロパティマップ(0x9B)"""
+
+    def __post_init__(self):
+        self.code = 0x9B
+        self.accessRules = [Access.GET]
+
+
+@dataclass
+class GetMPropertyMap(PropertyMap):
+    """GetMプロパティマップ(0x9C)"""
+
+    def __post_init__(self):
+        self.code = 0x9C
+        self.accessRules = [Access.GET]
+
+
+@dataclass
+class ChangeAnnoPropertyMap(PropertyMap):
+    """状変アナウンスプロパティマップ(0x9D)"""
+
+    def __post_init__(self):
+        self.code = 0x9D
+        self.accessRules = [Access.GET]
+
+
+@dataclass
+class SetPropertyMap(PropertyMap):
+    """Setプロパティマップ(0x9E)"""
+
+    def __post_init__(self):
+        self.code = 0x9E
+        self.accessRules = [Access.GET]
+
+
+@dataclass
+class GetPropertyMap(PropertyMap):
+    """Getプロパティマップ(0x9F)"""
+
+    def __post_init__(self):
+        self.code = 0x9F
+        self.accessRules = [Access.GET]
