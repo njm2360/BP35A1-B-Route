@@ -292,3 +292,32 @@ class CurrentLimitSetting(Property):
             raise NotImplementedError()
 
         return result
+
+
+@dataclass
+class AbnormalState(Property):
+    """異常発生状態(0x88)"""
+
+    status: bool = False
+    """異常状態"""
+
+    def __post_init__(self):
+        self.code = 0x88
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        status = data[0] == 0x41
+        return cls(status)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result

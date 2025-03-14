@@ -8,6 +8,7 @@ from app.echonet.protocol.esv import ESV
 from app.echonet.protocol.access import Access
 
 from app.echonet.property.base_property import (
+    AbnormalState,
     CumulativePowerConsumption,
     CurrentLimitSetting,
     IdentifierNo,
@@ -52,7 +53,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x87:  # 電流制限設定
             return CurrentLimitSetting.decode
         case 0x88:  # 異常発生状態
-            pass  # return AbnormalState()
+            return AbnormalState.decode
         case 0x89:  # 異常内容
             pass  # return AbnormalContent()
         case 0x8A:  # 会員ID／メーカコード
