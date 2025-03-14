@@ -199,3 +199,32 @@ class InstantPowerConsumption(Property):
             raise NotImplementedError()
 
         return result
+
+
+@dataclass
+class CumulativePowerConsumption(Property):
+    """積算消費電力量計測値(0x85)"""
+
+    value: float = 0
+    """計測値(kWh)"""
+
+    def __post_init__(self):
+        self.code = 0x85
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = int.from_bytes(data, byteorder="big") / 1000
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result

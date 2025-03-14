@@ -8,6 +8,7 @@ from app.echonet.protocol.esv import ESV
 from app.echonet.protocol.access import Access
 
 from app.echonet.property.base_property import (
+    CumulativePowerConsumption,
     IdentifierNo,
     InstallLocation,
     InstantPowerConsumption,
@@ -43,7 +44,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x84:  # 瞬時消費電力計測値
             return InstantPowerConsumption.decode
         case 0x85:  # 積算消費電力量計測値
-            pass  # return CumulativePowerConsumption()
+            return CumulativePowerConsumption.decode
         case 0x86:  # メーカ異常コード
             pass  # return ManufacturerErrorCode()
         case 0x87:  # 電流制限設定
