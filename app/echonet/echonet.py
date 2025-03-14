@@ -7,7 +7,14 @@ from app.echonet.protocol.eoj import EOJ
 from app.echonet.protocol.esv import ESV
 from app.echonet.protocol.access import Access
 
-from app.echonet.property.base_property import IdentifierNo, InstallLocation, OpStatus, Property, VersionInfo
+from app.echonet.property.base_property import (
+    IdentifierNo,
+    InstallLocation,
+    InstantPowerConsumption,
+    OpStatus,
+    Property,
+    VersionInfo,
+)
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
     CumulativeEnergyNormalDir,
     CumulativeEnergyReverseDir,
@@ -32,9 +39,9 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x82:  # 規格Version情報
             return VersionInfo.decode
         case 0x83:  # 識別番号
-            pass # return IdentifierNo.decode # デコーダ未実装
+            pass  # return IdentifierNo.decode # デコーダ未実装
         case 0x84:  # 瞬時消費電力計測値
-            pass  # return InstantPowerConsumption()
+            return InstantPowerConsumption.decode
         case 0x85:  # 積算消費電力量計測値
             pass  # return CumulativePowerConsumption()
         case 0x86:  # メーカ異常コード

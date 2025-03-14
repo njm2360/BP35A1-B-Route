@@ -143,6 +143,7 @@ class VersionInfo(Property):
 
         return result
 
+
 @dataclass
 class IdentifierNo(Property):
     """識別番号(0x83)"""
@@ -157,6 +158,35 @@ class IdentifierNo(Property):
     @classmethod
     def decode(cls, data: bytes):
         raise NotImplementedError()
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result
+
+
+@dataclass
+class InstantPowerConsumption(Property):
+    """瞬時消費電力計測値(0x84)"""
+
+    value: int = 0
+    """計測値(W)"""
+
+    def __post_init__(self):
+        self.code = 0x84
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = int.from_bytes(data, byteorder="big")
+        return cls(value)
 
     def encode(self, mode: Access) -> list[int]:
         result: list[int] = []
