@@ -36,9 +36,9 @@ class MomentPower(Property):
 class MomentCurrent(Property):
     """瞬時電流計測値(0xE8)"""
 
-    rPhase: float = None
+    r_phase: float = None
     """R相電流"""
-    tPhase: float = None
+    t_phase: float = None
     """T相電流"""
 
     def __post_init__(self):
@@ -59,8 +59,8 @@ class MomentCurrent(Property):
             result.append(0x00)
         else:
             result.append(0x04)
-            result.extend(int(self.rPhase * 10).to_bytes(2, byteorder="big"))
-            result.extend(int(self.tPhase * 10).to_bytes(2, byteorder="big"))
+            result.extend(int(self.r_phase * 10).to_bytes(2, byteorder="big"))
+            result.extend(int(self.t_phase * 10).to_bytes(2, byteorder="big"))
 
         return result
 

@@ -1,6 +1,5 @@
 from collections import deque
 
-from app.echonet.property.base_property import Location, OpStatus, Property
 from app.echonet.classcode import ClassCode, ClassGroupCode
 
 from app.echonet.protocol.ehd import EHD
@@ -8,6 +7,7 @@ from app.echonet.protocol.eoj import EOJ
 from app.echonet.protocol.esv import ESV
 from app.echonet.protocol.access import Access
 
+from app.echonet.property.base_property import InstallLocation, OpStatus, Property
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
     CumulativeEnergyNormalDir,
     CumulativeEnergyReverseDir,
@@ -28,7 +28,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x80:  # 動作状態
             return OpStatus.decode
         case 0x81:  # 設置場所
-            return Location.decode
+            return InstallLocation.decode
         case 0x82:  # 規格Version情報
             pass  # return VersionInfo()
         case 0x83:  # 識別番号
@@ -147,6 +147,25 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
 
 
 class ProtocolTx:
+    ESV_ACCESS_RULES = {
+        ESV.SetI: [Access.SET],
+        ESV.SetC: [Access.SET],
+        ESV.Get: [Access.GET],
+        ESV.Inf_Req: [Access.ANNO],
+        ESV.SetGet: [Access.SET, Access.GET],
+        ESV.SetRes: [Access.SET],
+        ESV.GetRes: [Access.GET],
+        ESV.Inf: [Access.ANNO],
+        ESV.InfC: [Access.ANNO],
+        ESV.InfcRes: [Access.ANNO],
+        ESV.SetGetRes: [Access.SET, Access.GET],
+        ESV.SetI_Sna: [Access.SET],
+        ESV.SetC_Sna: [Access.SET],
+        ESV.Get_Sna: [Access.GET],
+        ESV.Inf_Sna: [Access.ANNO],
+        ESV.SetGet_Sna: [Access.SET, Access.GET],
+    }
+
     def __init__(
         self,
         eoj: EOJ,
@@ -159,18 +178,10 @@ class ProtocolTx:
         self._eoj = eoj
         self._esv = esv
         self._properties: deque[Property] = deque()
-        self._limitAccessRules: list[Access] = []
-
-        # もっといい書き方あるはず、後で直す
-        if self._esv in [ESV.SetI, ESV.SetC, ESV.SetRes]:
-            self._limitAccessRules.append(Access.SET)
-        elif self._esv in [ESV.Get, ESV.GetRes]:
-            self._limitAccessRules.append(Access.GET)
-        elif self._esv in [ESV.Inf_Req, ESV.InfcRes]:
-            self._limitAccessRules.append(Access.ANNO)
-        elif self._esv in [ESV.SetGet, ESV.SetGetRes]:
-            self._limitAccessRules.append(Access.SET)
-            self._limitAccessRules.append(Access.GET)
+        self._limitAccessRules = self.ESV_ACCESS_RULES.get(self._esv, [])
+        self._encode_mode = (
+            Access.GET if Access.GET in self._limitAccessRules else Access.SET
+        )
 
     def add(self, property: Property):
         if any(rule in self._limitAccessRules for rule in property.accessRules):
@@ -193,8 +204,9 @@ class ProtocolTx:
 
         while self._properties:
             tx_property = self._properties.popleft()
-            tx_data = tx_property.encode(mode=Access.GET)
+            tx_data = tx_property.encode(mode=self._encode_mode)
 
+            # ToDo 1232Byte制限はECHONET Lite仕様ではなくBP35A1の仕様、ここに書くべきではない
             if len(result) + len(tx_data) <= 1232:
                 result.extend(tx_data)
             else:
@@ -207,32 +219,37 @@ class ProtocolTx:
 
 
 class ProtocolRx:
-    def proc(self, data: bytes) -> tuple[Property]:
-        if not self.is_valid_protocol(data):
+    @classmethod
+    def proc(cls, data: bytes) -> tuple[Property]:
+        if not cls._is_valid_protocol(data):
             return tuple()
 
         if len(data) < 12:
             return tuple()
 
-        self._tid = int.from_bytes(data[2:4], byteorder="big")
-        self._eoj = EOJ.decode(data[4:10])
-        self._esv = ESV(data[10])
-        self._opc = data[11]
+        cls._tid = int.from_bytes(data[2:4], byteorder="big")
+        cls._eoj = EOJ.decode(data[4:10])
+        cls._esv = ESV(data[10])
+        cls._opc = data[11]
 
-        return self.parse_properties(data, start_index=12)
+        print(f"TID: {cls._tid}, ESV: 0x{cls._esv:02x}, OPC: {cls._opc}")
 
-    def is_valid_protocol(self, data: bytes) -> bool:
+        return cls._parse_properties(data, start_index=12)
+
+    @classmethod
+    def _is_valid_protocol(cls, data: bytes) -> bool:
         return (
             len(data) >= 2
             and data[0] == EHD.EHD1.ECHONET_LITE
             and data[1] == EHD.EHD2.FORMAT1
         )
 
-    def parse_properties(self, data: bytes, start_index: int) -> tuple[Property]:
+    @classmethod
+    def _parse_properties(cls, data: bytes, start_index: int) -> tuple[Property]:
         result: list[Property] = []
         index = start_index
 
-        for _ in range(self._opc):
+        for _ in range(cls._opc):
             if len(data) <= index + 1:
                 break
 
@@ -240,13 +257,14 @@ class ProtocolRx:
             pdc = data[index + 1]
             index += 2
 
-            if len(data) < index + pdc:
+            if len(data) < index + pdc or pdc == 0:
                 break
+            # ToDo PDC=0 の際は応答もしくは自端末へのGET要求、どう処理する？
 
             edt = data[index : index + pdc]
             index += pdc
 
-            decoder = getPropertyDecoder(src=self._eoj.src, epc=epc)
+            decoder = getPropertyDecoder(src=cls._eoj.src, epc=epc)
             if decoder:
                 property = decoder(edt)
                 result.append(property)
