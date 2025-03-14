@@ -95,6 +95,11 @@ class BP35A1:
     async def init(self, id: str, password: str):
         await self._send_command(f"SKRESET")
         await self._send_command(f"SKSREG SFE 0")
+
+        opt = await self._send_command(f"ROPT")
+        if opt != "01":
+            await self._send_command(f"WOPT 01")
+
         await self._send_command(f"SKSETRBID {id}")
         await self._send_command(f"SKSETPWD {len(password):X} {password}")
 
