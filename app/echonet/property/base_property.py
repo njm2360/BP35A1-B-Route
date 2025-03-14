@@ -263,3 +263,32 @@ class ManufacturerErrorCode(Property):
             raise NotImplementedError()
 
         return result
+
+
+@dataclass
+class CurrentLimitSetting(Property):
+    """電流制限設定(0x87)"""
+
+    value: int = 0
+    """設定値(%)"""
+
+    def __post_init__(self):
+        self.code = 0x87
+        self.accessRules = [Access.GET]
+
+    @classmethod
+    def decode(cls, data: bytes):
+        value = data[0]
+        return cls(value)
+
+    def encode(self, mode: Access) -> list[int]:
+        result: list[int] = []
+
+        result.append(self.code)
+
+        if mode == Access.GET:
+            result.append(0x00)
+        else:
+            raise NotImplementedError()
+
+        return result

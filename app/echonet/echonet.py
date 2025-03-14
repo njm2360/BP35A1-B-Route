@@ -9,6 +9,7 @@ from app.echonet.protocol.access import Access
 
 from app.echonet.property.base_property import (
     CumulativePowerConsumption,
+    CurrentLimitSetting,
     IdentifierNo,
     InstallLocation,
     InstantPowerConsumption,
@@ -49,7 +50,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
         case 0x86:  # メーカ異常コード
             return ManufacturerErrorCode.decode
         case 0x87:  # 電流制限設定
-            pass  # return CurrentLimitSetting()
+            return CurrentLimitSetting.decode
         case 0x88:  # 異常発生状態
             pass  # return AbnormalState()
         case 0x89:  # 異常内容
