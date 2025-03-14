@@ -51,7 +51,7 @@ async def run():
             result = await bp35a1.get_next_result()
 
             if isinstance(result, BP35A1.RxData):
-                properties = ProtocolRx().proc(data=result.data)
+                properties = ProtocolRx.proc(data=result.data)
                 for property in properties:
                     if isinstance(property, InstanceListNotify):
                         sm_enet_obj = property.enet_objs[0]
@@ -62,20 +62,20 @@ async def run():
         )
 
         protocolTx.add(MomentPower())
-        # protocolTx.add(MomentCurrent())
         data = protocolTx.make()
-
         await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
 
         while True:
             result = await bp35a1.get_next_result()
 
             if isinstance(result, BP35A1.RxData):
-                properties = ProtocolRx().proc(data=result.data)
+                properties = ProtocolRx.proc(data=result.data)
                 for property in properties:
                     print(property)
-
-                await bp35a1.send_udp(pan_ip_address, 3610, data)
+                    if isinstance(property, MomentPower):
+                        protocolTx.add(MomentPower())
+                        data = protocolTx.make()
+                        await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
             elif isinstance(result, BP35A1.Event):
                 if result.code != BP35A1.EventCode.UDP_SEND_OK:
                     print(result)

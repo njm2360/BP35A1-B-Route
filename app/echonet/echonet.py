@@ -214,6 +214,8 @@ class ProtocolTx:
                 break
 
         self._tid += 0x0001
+        if self._tid > 0xFFFF:
+            self._tid = 0x0001
 
         return bytes(result)
 
