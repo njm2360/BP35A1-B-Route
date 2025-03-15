@@ -6,55 +6,13 @@ from app.echonet.protocol.ehd import EHD
 from app.echonet.protocol.eoj import EOJ
 from app.echonet.protocol.esv import ESV
 from app.echonet.protocol.access import Access
+from app.echonet.property.property import Property
 
-from app.echonet.property.base_property import (
-    AbnormalState,
-    BusinessCode,
-    ChangeAnnoPropertyMap,
-    CumulativeOperatingTime,
-    CumulativePowerConsumption,
-    CurrentDate,
-    CurrentLimitSetting,
-    CurrentTime,
-    GetMPropertyMap,
-    GetPropertyMap,
-    InstallLocation,
-    InstantPowerConsumption,
-    ManufactureDate,
-    ManufacturerErrorCode,
-    MemberID,
-    OpStatus,
-    PowerLimitSetting,
-    PowerSavingMode,
-    ProductCode,
-    Property,
-    RemoteControlSetting,
-    SerialNumber,
-    SetMPropertyMap,
-    SetPropertyMap,
-    VersionInfo,
-)
+from app.echonet.property.base_property import BaseProperty
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
-    BrouteIdentifyNo,
-    Coefficient,
-    CumulativeEnergyMeasurementHistory1NormalDir,
-    CumulativeEnergyMeasurementHistory1ReverseDir,
-    CumulativeEnergyMeasurementHistory2,
-    CumulativeEnergyMeasurementHistory3,
-    CumulativeEnergyMeasurementNormalDir,
-    CumulativeEnergyMeasurementReverseDir,
-    CumulativeHistoryCollectDay2,
-    CumulativeHistoryCollectDay3,
-    IntCumulativeEnergyNormalDir,
-    IntCumulativeEnergyReverseDir,
-    CumulativeEnergySignificantDigit,
-    CumulativeEnergyUnit,
-    CumulativeHistoryCollectDay1,
-    MomentCurrent,
-    MomentPower,
-    OneMinuteCumulativeEnergy,
+    LowVoltageSmartPm as LVSPM,
 )
-from app.echonet.property.profile.node_profile import InstanceListNotify
+from app.echonet.property.profile.node_profile import NodeProfile
 
 ECHONET_LITE_PORT = 3610
 
@@ -66,57 +24,57 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
     # 機器オブジェクトスーパークラス構成プロパティ
     match epc:
         case 0x80:  # 動作状態
-            return OpStatus.decode
+            return BaseProperty.OpStatus.decode
         case 0x81:  # 設置場所
-            return InstallLocation.decode
+            return BaseProperty.InstallLocation.decode
         case 0x82:  # 規格Version情報
-            return VersionInfo.decode
+            return BaseProperty.VersionInfo.decode
         case 0x83:  # 識別番号
-            pass  # return IdentifierNo.decode # デコーダ未実装
+            pass  # return BaseProperty.IdentifierNo.decode # デコーダ未実装
         case 0x84:  # 瞬時消費電力計測値
-            return InstantPowerConsumption.decode
+            return BaseProperty.InstantPowerConsumption.decode
         case 0x85:  # 積算消費電力量計測値
-            return CumulativePowerConsumption.decode
+            return BaseProperty.CumulativePowerConsumption.decode
         case 0x86:  # メーカ異常コード
-            return ManufacturerErrorCode.decode
+            return BaseProperty.ManufacturerErrorCode.decode
         case 0x87:  # 電流制限設定
-            return CurrentLimitSetting.decode
+            return BaseProperty.CurrentLimitSetting.decode
         case 0x88:  # 異常発生状態
-            return AbnormalState.decode
+            return BaseProperty.AbnormalState.decode
         case 0x89:  # 異常内容
-            pass  # return AbnormalContent.decode # 複雑なので保留
+            pass  # return BaseProperty.AbnormalContent.decode # 複雑なので保留
         case 0x8A:  # 会員ID／メーカコード
-            return MemberID.decode
+            return BaseProperty.MemberID.decode
         case 0x8B:  # 事業場コード
-            return BusinessCode.decode
+            return BaseProperty.BusinessCode.decode
         case 0x8C:  # 商品コード
-            return ProductCode.decode
+            return BaseProperty.ProductCode.decode
         case 0x8D:  # 製造番号
-            return SerialNumber.decode
+            return BaseProperty.SerialNumber.decode
         case 0x8E:  # 製造年月日
-            return ManufactureDate.decode
+            return BaseProperty.ManufactureDate.decode
         case 0x8F:  # 節電動作設定
-            return PowerSavingMode.decode
+            return BaseProperty.PowerSavingMode.decode
         case 0x93:  # 遠隔操作設定
-            return RemoteControlSetting.decode
+            return BaseProperty.RemoteControlSetting.decode
         case 0x97:  # 現在時刻設定
-            return CurrentTime.decode
+            return BaseProperty.CurrentTime.decode
         case 0x98:  # 現在年月日設定
-            return CurrentDate.decode
+            return BaseProperty.CurrentDate.decode
         case 0x99:  # 電力制限設定
-            return PowerLimitSetting.decode
+            return BaseProperty.PowerLimitSetting.decode
         case 0x9A:  # 積算運転時間
-            return CumulativeOperatingTime.decode
+            return BaseProperty.CumulativeOperatingTime.decode
         case 0x9B:  # SetMプロパティマップ
-            return SetMPropertyMap.decode
+            return BaseProperty.SetMPropertyMap.decode
         case 0x9C:  # GetMプロパティマップ
-            return GetMPropertyMap.decode
+            return BaseProperty.GetMPropertyMap.decode
         case 0x9D:  # 状変アナウンスプロパティマップ
-            return ChangeAnnoPropertyMap.decode
+            return BaseProperty.ChangeAnnoPropertyMap.decode
         case 0x9E:  # Setプロパティマップ
-            return SetPropertyMap.decode
+            return BaseProperty.SetPropertyMap.decode
         case 0x9F:  # Getプロパティマップ
-            return GetPropertyMap.decode
+            return BaseProperty.GetPropertyMap.decode
 
     match src.classGroupCode:
         case ClassGroupCode.SensorDevice:
@@ -128,41 +86,45 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
                 case ClassCode.LowVoltageSmartPowerMeter:
                     match epc:
                         case 0xC0:  # B ルート識別番号
-                            return BrouteIdentifyNo.decode
+                            return LVSPM.BrouteIdentifyNo.decode
                         case 0xD0:  # 1分積算電力量計測値（正方向、逆方向計測値）
-                            return OneMinuteCumulativeEnergy.decode
+                            return LVSPM.OneMinuteCumulativeEnergy.decode
                         case 0xD3:  # 係数
-                            return Coefficient.decode
+                            return LVSPM.Coefficient.decode
                         case 0xD7:  # 積算電力量有効桁数
-                            return CumulativeEnergySignificantDigit.decode
+                            return LVSPM.CumulativeEnergySignificantDigit.decode
                         case 0xE0:  # 積算電力量計測値（正方向計測値）
-                            return CumulativeEnergyMeasurementNormalDir.decode
+                            return LVSPM.CumulativeEnergyMeasurementNormalDir.decode
                         case 0xE1:  # 積算電力量単位（正方向、逆方向計測値）
-                            return CumulativeEnergyUnit.decode
+                            return LVSPM.CumulativeEnergyUnit.decode
                         case 0xE2:  # 積算電力量計測値履歴１(正方向計測値)
-                            return CumulativeEnergyMeasurementHistory1NormalDir.decode
+                            return (
+                                LVSPM.CumulativeEnergyMeasurementHistory1NormalDir.decode
+                            )
                         case 0xE3:  # 積算電力量計測値(逆方向計測値)
-                            return CumulativeEnergyMeasurementReverseDir.decode
+                            return LVSPM.CumulativeEnergyMeasurementReverseDir.decode
                         case 0xE4:  # 積算電力量計測値履歴１(逆方向計測値)
-                            return CumulativeEnergyMeasurementHistory1ReverseDir.decode
+                            return (
+                                LVSPM.CumulativeEnergyMeasurementHistory1ReverseDir.decode
+                            )
                         case 0xE5:  # 積算履歴収集日１
-                            return CumulativeHistoryCollectDay1.decode
+                            return LVSPM.CumulativeHistoryCollectDay1.decode
                         case 0xE7:  # 瞬時電力計測値
-                            return MomentPower.decode
+                            return LVSPM.MomentPower.decode
                         case 0xE8:  # 瞬時電流計測値
-                            return MomentCurrent.decode
+                            return LVSPM.MomentCurrent.decode
                         case 0xEA:  # 定時積算電力量計測値（正方向計測値）
-                            return IntCumulativeEnergyNormalDir.decode
+                            return LVSPM.IntCumulativeEnergyNormalDir.decode
                         case 0xEB:  # 定時積算電力量計測値（逆方向計測値）
-                            return IntCumulativeEnergyReverseDir.decode
+                            return LVSPM.IntCumulativeEnergyReverseDir.decode
                         case 0xEC:  # 積算電力量計測値履歴２（正方向、逆方向計測値）
-                            return CumulativeEnergyMeasurementHistory2.decode
+                            return LVSPM.CumulativeEnergyMeasurementHistory2.decode
                         case 0xED:  # 積算履歴収集日２
-                            return CumulativeHistoryCollectDay2.decode
+                            return LVSPM.CumulativeHistoryCollectDay2.decode
                         case 0xEE:  # 積算電力量計測値履歴３（正方向、逆方向計測値）
-                            return CumulativeEnergyMeasurementHistory3.decode
+                            return LVSPM.CumulativeEnergyMeasurementHistory3.decode
                         case 0xEF:  # 積算履歴収集日３
-                            return CumulativeHistoryCollectDay3.decode
+                            return LVSPM.CumulativeHistoryCollectDay3.decode
         case ClassGroupCode.CookingHouseWorkDevice:
             pass
         case ClassGroupCode.HealthDevice:
@@ -182,7 +144,7 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
                         case 0xD4:  # 自ノードクラス数
                             pass
                         case 0xD5:  # インスタンスリスト通知
-                            return InstanceListNotify.decode
+                            return NodeProfile.InstanceListNotify.decode
                         case 0xD6:  # 自ノードインスタンスリストＳ
                             pass
                         case 0xD7:  # 自ノードクラスリストＳ

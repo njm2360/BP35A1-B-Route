@@ -7,10 +7,12 @@ from app.bp35a1.bp35a1 import BP35A1
 from app.echonet.classcode import ClassCode, ClassGroupCode
 
 from app.echonet.echonet import ECHONET_LITE_PORT, ProtocolTx, ProtocolRx
+from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
+    LowVoltageSmartPm,
+)
+from app.echonet.property.profile.node_profile import NodeProfile
 from app.echonet.protocol.eoj import EOJ
 from app.echonet.protocol.esv import ESV
-from app.echonet.property.home_equipment_device.low_voltage_smart_pm import MomentPower
-from app.echonet.property.profile.node_profile import InstanceListNotify
 
 
 async def main_task(bp35a1: BP35A1):
@@ -48,14 +50,14 @@ async def main_task(bp35a1: BP35A1):
         if isinstance(result, BP35A1.RxData):
             properties = ProtocolRx.proc(data=result.data)
             for property in properties:
-                if isinstance(property, InstanceListNotify):
+                if isinstance(property, NodeProfile.InstanceListNotify):
                     sm_enet_obj = property.enet_objs[0]
 
     protocolTx = ProtocolTx(
         eoj=EOJ(src=CTRL_ENET_OBJ, dst=sm_enet_obj),
         esv=ESV.Get,
     )
-    protocolTx.add(MomentPower())
+    protocolTx.add(LowVoltageSmartPm.MomentPower())
     data = protocolTx.make()
     await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
 
@@ -66,8 +68,8 @@ async def main_task(bp35a1: BP35A1):
             properties = ProtocolRx.proc(data=result.data)
             for property in properties:
                 print(property)
-                if isinstance(property, MomentPower):
-                    protocolTx.add(MomentPower())
+                if isinstance(property, LowVoltageSmartPm.MomentPower):
+                    protocolTx.add(LowVoltageSmartPm.MomentPower())
                     data = protocolTx.make()
                     await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
 
