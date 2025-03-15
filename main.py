@@ -11,25 +11,23 @@ from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
     LowVoltageSmartPm,
 )
 from app.echonet.property.profile.node_profile import NodeProfile
-from app.echonet.protocol.eoj import EOJ
-from app.echonet.protocol.esv import ESV
+from app.echonet.protocol.eoj import EnetObject, EnetObjectHeader
+from app.echonet.protocol.esv import EnetService
 
 
 async def main_task(bp35a1: BP35A1):
-    load_dotenv()
-
     RB_ID = os.getenv("RB_ID")
     RB_PASSWORD = os.getenv("RB_PASSWORD")
 
     EPAN_DATA_JSON = "epan.json"
 
-    CTRL_ENET_OBJ = EOJ.EnetObj(
+    CTRL_ENET_OBJ = EnetObject(
         classGroupCode=ClassGroupCode.ManagerOpDevice,
         classCode=ClassCode.Controller,
         instanceCode=0x01,
     )
 
-    sm_enet_obj: EOJ.EnetObj = None
+    sm_enet_obj: EnetObject = None
 
     await bp35a1.init(RB_ID, RB_PASSWORD)
 
@@ -48,14 +46,14 @@ async def main_task(bp35a1: BP35A1):
         result = await bp35a1.get_next_result()
 
         if isinstance(result, BP35A1.RxData):
-            properties = ProtocolRx.proc(data=result.data)
-            for property in properties:
+            receive_data = ProtocolRx.proc(data=result.data)
+            for property in receive_data.properties:
                 if isinstance(property, NodeProfile.InstanceListNotify):
                     sm_enet_obj = property.enet_objs[0]
 
     protocolTx = ProtocolTx(
-        eoj=EOJ(src=CTRL_ENET_OBJ, dst=sm_enet_obj),
-        esv=ESV.Get,
+        enet_object_header=EnetObjectHeader(src=CTRL_ENET_OBJ, dst=sm_enet_obj),
+        enet_service=EnetService.Get,
     )
     protocolTx.add(LowVoltageSmartPm.MomentPower())
     data = protocolTx.make()
@@ -65,8 +63,8 @@ async def main_task(bp35a1: BP35A1):
         result = await bp35a1.get_next_result()
 
         if isinstance(result, BP35A1.RxData):
-            properties = ProtocolRx.proc(data=result.data)
-            for property in properties:
+            receive_data = ProtocolRx.proc(data=result.data)
+            for property in receive_data.properties:
                 print(property)
                 if isinstance(property, LowVoltageSmartPm.MomentPower):
                     protocolTx.add(LowVoltageSmartPm.MomentPower())
@@ -79,7 +77,11 @@ async def main_task(bp35a1: BP35A1):
 
 
 async def run():
-    bp35a1 = BP35A1(port="COM3")
+    load_dotenv()
+
+    SERIAL_PORT = os.getenv("SERIAL_PORT")
+
+    bp35a1 = BP35A1(port=SERIAL_PORT)
 
     tasks = [
         asyncio.create_task(bp35a1.proc_rx()),

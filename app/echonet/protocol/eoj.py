@@ -4,21 +4,22 @@ from app.echonet.classcode import ClassCode, ClassGroupCode
 
 
 @dataclass
-class EOJ:
+class EnetObject:
+    classGroupCode: ClassGroupCode
+    """クラスグループコード"""
+    classCode: ClassCode
+    """クラスコード"""
+    instanceCode: int
+    """インスタンスコード"""
+
+
+@dataclass
+class EnetObjectHeader:
     """ECHONET オブジェクト（EOJ）"""
 
-    @dataclass
-    class EnetObj:
-        classGroupCode: ClassGroupCode
-        """クラスグループコード"""
-        classCode: ClassCode
-        """クラスコード"""
-        instanceCode: int
-        """インスタンスコード"""
-
-    src: EnetObj
+    src: EnetObject
     """送信元ECHONET Liteオブジェクト指定"""
-    dst: EnetObj
+    dst: EnetObject
     """相手先ECHONET Liteオブジェクト指定 """
 
     def encode(self) -> list[int]:
@@ -32,15 +33,19 @@ class EOJ:
         ]
 
     @classmethod
-    def decode(cls, data: bytes) -> "EOJ":
-        return EOJ(
-            src=cls.decode_single(data[0:3]),
-            dst=cls.decode_single(data[3:6]),
+    def decode(cls, data: bytes) -> "EnetObjectHeader":
+        if len(data) != 6:
+            raise ValueError(f"Invalid data length: expected 6 bytes, got {len(data)}")
+        return EnetObjectHeader(
+            src=cls.decode_enet_obj(data[0:3]),
+            dst=cls.decode_enet_obj(data[3:6]),
         )
 
     @classmethod
-    def decode_single(cls, data: bytes) -> "EOJ.EnetObj":
-        return EOJ.EnetObj(
+    def decode_enet_obj(cls, data: bytes) -> "EnetObject.EnetObj":
+        if len(data) != 3:
+            raise ValueError(f"Invalid data length: expected 3 bytes, got {len(data)}")
+        return EnetObject(
             classGroupCode=ClassGroupCode(int(data[0])),
             classCode=ClassCode(int(data[1])),
             instanceCode=int(data[2]),

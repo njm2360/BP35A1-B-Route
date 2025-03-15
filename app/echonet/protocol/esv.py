@@ -1,7 +1,7 @@
 from enum import IntEnum
 
 
-class ESV(IntEnum):
+class EnetService(IntEnum):
     """ECHONET Lite サービス（ESV）"""
 
     # ==========要求用ESV コード一覧表==========

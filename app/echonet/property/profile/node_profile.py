@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from app.echonet.property.base_property import Property
 from app.echonet.protocol.access import Access
-from app.echonet.protocol.eoj import EOJ
+from app.echonet.protocol.eoj import EnetObject, EnetObjectHeader
 
 
 class NodeProfile:
@@ -12,7 +12,7 @@ class NodeProfile:
 
         count: int
         """通報インスタンス数"""
-        enet_objs: list[EOJ.EnetObj]
+        enet_objs: list[EnetObject]
         """ECHONETオブジェクトコード"""
 
         def __post_init__(self):
@@ -36,7 +36,9 @@ class NodeProfile:
             index = 1
 
             for i in range(count):
-                enet_objs.append(EOJ.decode_single(data[index : index + 3]))
+                enet_objs.append(
+                    EnetObjectHeader.decode_enet_obj(data[index : index + 3])
+                )
                 index += 3
 
             return cls(count, enet_objs)
