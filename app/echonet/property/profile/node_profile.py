@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.echonet.property.base_property import Property
 from app.echonet.protocol.access import Access
@@ -10,14 +10,27 @@ class InstanceListNotify(Property):
     """インスタンスリスト通知"""
 
     count: int
+    """通報インスタンス数"""
     enet_objs: list[EOJ.EnetObj]
+    """ECHONETオブジェクトコード"""
 
-    code: int = field(init=False, default=0xD5)
-    accessRules: list[Access] = field(init=False, default_factory=lambda: [Access.ANNO])
+    def __post_init__(self):
+        self.code = 0xD5
+        self.accessRules = [Access.ANNO]
 
     @classmethod
     def decode(cls, data: bytes) -> "InstanceListNotify":
+        if len(data) < 1:
+            raise ValueError("Invalid data: at least 1 byte is required for count.")
+
         count = data[0]
+
+        expected_length = 1 + count * 3
+        if len(data) != expected_length:
+            raise ValueError(
+                f"Invalid data length: expected {expected_length} bytes, got {len(data)}"
+            )
+
         enet_objs = []
         index = 1
 

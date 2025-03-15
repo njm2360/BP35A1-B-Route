@@ -12,7 +12,7 @@ from app.echonet.protocol.access import Access
 class OpStatus(Property):
     """動作状態(0x80)"""
 
-    status: bool = False
+    status: Optional[bool] = None
     """状態"""
 
     def __post_init__(self):
@@ -20,19 +20,19 @@ class OpStatus(Property):
         self.accessRules = [Access.GET, Access.SET]
 
     @classmethod
-    def decode(cls, data: bytes):
+    def decode(cls, data: bytes) -> "OpStatus":
+        if len(data) != 1:
+            raise ValueError(f"Invalid data length: expected 1 byte, got {len(data)}")
         return cls(status=data[0] == 0x30)
 
-    def encode(self, mode: Access) -> list[int]:
-        result: list[int] = [self.code]
+    def encode(self, mode: Access, simulate: bool = False) -> list[int]:
+        if mode == Access.GET or simulate:
+            return [self.code, 0x00]
 
-        if mode == Access.GET:
-            result.append(0x00)
-        else:
-            result.append(0x01)
-            result.append(0x30 if self.status else 0x31)
+        if mode == Access.SET:
+            return [self.code, 0x01, 0x30 if self.status else 0x31]
 
-        return result
+        raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
 
 @dataclass
@@ -286,7 +286,7 @@ class CurrentLimitSetting(Property):
 class AbnormalState(Property):
     """異常発生状態(0x88)"""
 
-    status: bool = False
+    abnormal: bool = False
     """異常状態"""
 
     def __post_init__(self):
@@ -295,8 +295,8 @@ class AbnormalState(Property):
 
     @classmethod
     def decode(cls, data: bytes):
-        status = data[0] == 0x41
-        return cls(status)
+        abnormal = data[0] == 0x41
+        return cls(abnormal)
 
     def encode(self, mode: Access) -> list[int]:
         result: list[int] = [self.code]

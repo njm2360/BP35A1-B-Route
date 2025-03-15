@@ -1,5 +1,6 @@
 import os
 import asyncio
+import traceback
 from dotenv import load_dotenv
 
 from app.bp35a1.bp35a1 import BP35A1
@@ -8,14 +9,11 @@ from app.echonet.classcode import ClassCode, ClassGroupCode
 from app.echonet.echonet import ECHONET_LITE_PORT, ProtocolTx, ProtocolRx
 from app.echonet.protocol.eoj import EOJ
 from app.echonet.protocol.esv import ESV
-from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
-    MomentCurrent,
-    MomentPower,
-)
+from app.echonet.property.home_equipment_device.low_voltage_smart_pm import MomentPower
 from app.echonet.property.profile.node_profile import InstanceListNotify
 
 
-async def run():
+async def main_task(bp35a1: BP35A1):
     load_dotenv()
 
     RB_ID = os.getenv("RB_ID")
@@ -30,61 +28,85 @@ async def run():
     )
 
     sm_enet_obj: EOJ.EnetObj = None
+
+    await bp35a1.init(RB_ID, RB_PASSWORD)
+
+    if os.path.exists(EPAN_DATA_JSON):
+        epan = BP35A1.Epan.from_json(file_path=EPAN_DATA_JSON)
+    else:
+        epan = await bp35a1.scan(init_duration=6)
+        if epan is None:
+            raise Exception("Epan not found")
+
+        epan.to_json(EPAN_DATA_JSON)
+
+    pan_ip_address = await bp35a1.connect(epan)
+
+    while sm_enet_obj is None:
+        result = await bp35a1.get_next_result()
+
+        if isinstance(result, BP35A1.RxData):
+            properties = ProtocolRx.proc(data=result.data)
+            for property in properties:
+                if isinstance(property, InstanceListNotify):
+                    sm_enet_obj = property.enet_objs[0]
+
+    protocolTx = ProtocolTx(
+        eoj=EOJ(src=CTRL_ENET_OBJ, dst=sm_enet_obj),
+        esv=ESV.Get,
+    )
+    protocolTx.add(MomentPower())
+    data = protocolTx.make()
+    await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
+
+    while True:
+        result = await bp35a1.get_next_result()
+
+        if isinstance(result, BP35A1.RxData):
+            properties = ProtocolRx.proc(data=result.data)
+            for property in properties:
+                print(property)
+                if isinstance(property, MomentPower):
+                    protocolTx.add(MomentPower())
+                    data = protocolTx.make()
+                    await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
+
+        elif isinstance(result, BP35A1.Event):
+            if result.code != BP35A1.EventCode.UDP_SEND_OK:
+                print(result)
+
+
+async def run():
     bp35a1 = BP35A1(port="COM3")
-    rx_task = asyncio.create_task(bp35a1.proc_rx())
+
+    tasks = [
+        asyncio.create_task(bp35a1.proc_rx()),
+        asyncio.create_task(main_task(bp35a1)),
+    ]
 
     try:
-        await bp35a1.init(RB_ID, RB_PASSWORD)
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
-        if os.path.exists(EPAN_DATA_JSON):
-            epan = BP35A1.Epan.from_json(file_path=EPAN_DATA_JSON)
-        else:
-            epan = await bp35a1.scan(init_duration=6)
-            if epan is None:
-                raise Exception("Epan not found")
+        for task in done:
+            try:
+                result = task.result()
+                print(f"Task completed successfully: {result}")
+            except asyncio.CancelledError:
+                print("Task was cancelled.")
+            except Exception as e:
+                print(f"Task failed with exception: {e}")
+                traceback.print_exc()
 
-            epan.to_json(EPAN_DATA_JSON)
+    except KeyboardInterrupt:
+        all_tasks = asyncio.all_tasks()
 
-        pan_ip_address = await bp35a1.connect(epan)
+        for task in all_tasks:
+            task.cancel()
 
-        while sm_enet_obj is None:
-            result = await bp35a1.get_next_result()
-
-            if isinstance(result, BP35A1.RxData):
-                properties = ProtocolRx.proc(data=result.data)
-                for property in properties:
-                    if isinstance(property, InstanceListNotify):
-                        sm_enet_obj = property.enet_objs[0]
-
-        protocolTx = ProtocolTx(
-            eoj=EOJ(src=CTRL_ENET_OBJ, dst=sm_enet_obj),
-            esv=ESV.Get,
-        )
-
-        protocolTx.add(MomentPower())
-        data = protocolTx.make()
-        await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
-
-        while True:
-            result = await bp35a1.get_next_result()
-
-            if isinstance(result, BP35A1.RxData):
-                properties = ProtocolRx.proc(data=result.data)
-                for property in properties:
-                    print(property)
-                    if isinstance(property, MomentPower):
-                        protocolTx.add(MomentPower())
-                        data = protocolTx.make()
-                        await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
-            elif isinstance(result, BP35A1.Event):
-                if result.code != BP35A1.EventCode.UDP_SEND_OK:
-                    print(result)
-
-    except asyncio.CancelledError:
-        pass
+        await asyncio.gather(*all_tasks, return_exceptions=True)
 
     finally:
-        rx_task.cancel()
+        await asyncio.sleep(0)
 
 
 if __name__ == "__main__":

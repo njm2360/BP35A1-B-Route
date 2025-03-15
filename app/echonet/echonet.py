@@ -35,10 +35,24 @@ from app.echonet.property.base_property import (
     VersionInfo,
 )
 from app.echonet.property.home_equipment_device.low_voltage_smart_pm import (
-    CumulativeEnergyNormalDir,
-    CumulativeEnergyReverseDir,
+    BrouteIdentifyNo,
+    Coefficient,
+    CumulativeEnergyMeasurementHistory1NormalDir,
+    CumulativeEnergyMeasurementHistory1ReverseDir,
+    CumulativeEnergyMeasurementHistory2,
+    CumulativeEnergyMeasurementHistory3,
+    CumulativeEnergyMeasurementNormalDir,
+    CumulativeEnergyMeasurementReverseDir,
+    CumulativeHistoryCollectDay2,
+    CumulativeHistoryCollectDay3,
+    IntCumulativeEnergyNormalDir,
+    IntCumulativeEnergyReverseDir,
+    CumulativeEnergySignificantDigit,
+    CumulativeEnergyUnit,
+    CumulativeHistoryCollectDay1,
     MomentCurrent,
     MomentPower,
+    OneMinuteCumulativeEnergy,
 )
 from app.echonet.property.profile.node_profile import InstanceListNotify
 
@@ -113,34 +127,42 @@ def getPropertyDecoder(src: EOJ.EnetObj, epc: int):
             match src.classCode:
                 case ClassCode.LowVoltageSmartPowerMeter:
                     match epc:
+                        case 0xC0:  # B ルート識別番号
+                            return BrouteIdentifyNo.decode
+                        case 0xD0:  # 1分積算電力量計測値（正方向、逆方向計測値）
+                            return OneMinuteCumulativeEnergy.decode
                         case 0xD3:  # 係数
-                            pass
+                            return Coefficient.decode
                         case 0xD7:  # 積算電力量有効桁数
-                            pass
+                            return CumulativeEnergySignificantDigit.decode
                         case 0xE0:  # 積算電力量計測値（正方向計測値）
-                            pass
+                            return CumulativeEnergyMeasurementNormalDir.decode
                         case 0xE1:  # 積算電力量単位（正方向、逆方向計測値）
-                            pass
+                            return CumulativeEnergyUnit.decode
                         case 0xE2:  # 積算電力量計測値履歴１(正方向計測値)
-                            pass
+                            return CumulativeEnergyMeasurementHistory1NormalDir.decode
                         case 0xE3:  # 積算電力量計測値(逆方向計測値)
-                            pass
+                            return CumulativeEnergyMeasurementReverseDir.decode
                         case 0xE4:  # 積算電力量計測値履歴１(逆方向計測値)
-                            pass
+                            return CumulativeEnergyMeasurementHistory1ReverseDir.decode
                         case 0xE5:  # 積算履歴収集日１
-                            pass
+                            return CumulativeHistoryCollectDay1.decode
                         case 0xE7:  # 瞬時電力計測値
                             return MomentPower.decode
                         case 0xE8:  # 瞬時電流計測値
                             return MomentCurrent.decode
                         case 0xEA:  # 定時積算電力量計測値（正方向計測値）
-                            return CumulativeEnergyNormalDir.decode
+                            return IntCumulativeEnergyNormalDir.decode
                         case 0xEB:  # 定時積算電力量計測値（逆方向計測値）
-                            return CumulativeEnergyReverseDir.decode
+                            return IntCumulativeEnergyReverseDir.decode
                         case 0xEC:  # 積算電力量計測値履歴２（正方向、逆方向計測値）
-                            pass
+                            return CumulativeEnergyMeasurementHistory2.decode
                         case 0xED:  # 積算履歴収集日２
-                            pass
+                            return CumulativeHistoryCollectDay2.decode
+                        case 0xEE:  # 積算電力量計測値履歴３（正方向、逆方向計測値）
+                            return CumulativeEnergyMeasurementHistory3.decode
+                        case 0xEF:  # 積算履歴収集日３
+                            return CumulativeHistoryCollectDay3.decode
         case ClassGroupCode.CookingHouseWorkDevice:
             pass
         case ClassGroupCode.HealthDevice:
