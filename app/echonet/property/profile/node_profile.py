@@ -35,10 +35,8 @@ class NodeProfile:
             enet_objs = []
             index = 1
 
-            for i in range(count):
-                enet_objs.append(
-                    EnetObjectHeader.decode_enet_obj(data[index : index + 3])
-                )
+            for _ in range(count):
+                enet_objs.append(EnetObject.decode(data[index : index + 3]))
                 index += 3
 
             return cls(count, enet_objs)
