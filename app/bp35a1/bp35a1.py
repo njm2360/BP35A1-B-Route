@@ -2,106 +2,85 @@ import re
 import asyncio
 import aioserial
 from asyncio import Queue
-from enum import IntEnum, StrEnum
-from typing import Optional, Union
-from dataclasses import dataclass
+from enum import StrEnum
+from typing import Final, Optional, Union
 
+from app.bp35a1.command import Command
+from app.bp35a1.rx_state import RxState
+from app.bp35a1.event import Epan, Event, EventCode, EventData, RxData
 from app.bp35a1.exception import CommandError, PANAConnectError, TxProhibisionError
-from app.repository.json_repo import JsonSerializable
 
 
 class BP35A1:
-    class EventData:
-        pass
+    SERIAL_BAUDRATE: Final[int] = 115200
 
-    class EventCode(IntEnum):
-        RECV_NS = 0x01
-        RECV_NA = 0x02
-        RECV_ECHO_REQ = 0x05
-        ED_SCAN_OK = 0x1F
-        RECV_BEACON = 0x20
-        UDP_SEND_OK = 0x21
-        ACTIVE_SCAN_OK = 0x22
-        PANA_CONNECT_ERROR = 0x24
-        PANA_CONNECT_OK = 0x25
-        RECV_SESSION_END = 0x26
-        PANA_SESSION_END_OK = 0x27
-        PANA_SESSION_END_TIMEOUT = 0x28
-        SESITON_LIFETIME_EXPIRE = 0x29
-        SEND_LIMIT_EXCEED = 0x32
-        SEND_LIMIT_CANCELED = 0x33
-
-    @dataclass
-    class Event(EventData):
-        code: "BP35A1.EventCode"
-        sender: str
-
-    @dataclass
-    class Epan(EventData, JsonSerializable):
-        channel: Optional[int] = None
-        channel_page: Optional[int] = None
-        pan_id: Optional[int] = None
-        mac_address: Optional[str] = None
-        lqi: Optional[int] = None
-        pair_id: Optional[str] = None
-
-        def is_complete(self) -> bool:
-            return all(
-                v is not None
-                for v in [
-                    self.channel,
-                    self.channel_page,
-                    self.pan_id,
-                    self.mac_address,
-                    self.lqi,
-                    self.pair_id,
-                ]
-            )
-
-    @dataclass
-    class RxData(EventData):
-        src_addr: str
-        dst_addr: str
-        src_port: int
-        dst_port: int
-        src_mac: str
-        secured: bool
-        length: int
-        data: bytes
-
-    class RxState(IntEnum):
-        NORMAL = 0
-        EADDR = 1
-        ENEIGHBOR = 2
-        EPANDESC = 3
-        EEDSCAN = 4
-        EPORT = 5
-        SKLL64 = 10
-        PRODUCT_CONFIG_READ = 40
+    AVAIABLE_BAUDRATES: Final[list[int]] = [
+        115200,
+        2400,
+        4800,
+        9600,
+        19200,
+        38400,
+        57600,
+    ]
 
     class NewLineCode(StrEnum):
         CRLF = "\r\n"
         CR = "\r"
 
     def __init__(self, port: str):
-        self._ser = aioserial.AioSerial(port=port, baudrate=115200, timeout=3)
+        self._ser = aioserial.AioSerial(
+            port=port, baudrate=self.SERIAL_BAUDRATE, timeout=3
+        )
         self._newline_code = self.NewLineCode.CRLF
-        self._rx_state = self.RxState.NORMAL
-        self._udp_tx_allowed = False
-        self._event_queue: Queue[Union[BP35A1.EventData]] = Queue()
+
+        self._buffer = bytearray()
+        self._buffer_lock = asyncio.Lock()
+        self._rx_state = RxState.NORMAL
+
+        self._event_queue: Queue[Union[EventData]] = Queue()
         self._result_queue: Queue[str] = Queue()
         self._response_queue: Queue[str] = Queue()
 
+        self._udp_tx_allowed: bool = False
+
     async def init(self, id: str, password: str):
-        await self._send_command(f"SKRESET")
-        await self._send_command(f"SKSREG SFE 0")
+        await self._correct_baudrate()
 
-        opt = await self._send_command(f"ROPT")
+        await self._send_command(Command.SKRESET, timeout=3, expect_echo=True)
+        await self._send_command(Command.SKSREG, ["SFE", "0"], expect_echo=True)
+
+        opt = await self._send_command(Command.ROPT)
         if opt != "01":
-            await self._send_command(f"WOPT 01")
+            await self._send_command(Command.WOPT, ["01"])
 
-        await self._send_command(f"SKSETRBID {id}")
-        await self._send_command(f"SKSETPWD {len(password):X} {password}")
+        await self._send_command(Command.SKSETRBID, [id])
+        await self._send_command(Command.SKSETPWD, [f"{len(password):X}", password])
+
+    async def _correct_baudrate(self):
+        print("Checking baudrate...")
+
+        # タイミングによってはなぜかSKVERがFAILを返すので2回ループ
+        for _ in range(2):
+            for baudrate in self.AVAIABLE_BAUDRATES:
+                try:
+                    self._ser.baudrate = baudrate
+
+                    print(f"Testing baudrate {baudrate}bps")
+
+                    await self.clear_buffer()
+                    await self._ser.write_async(b"\r\n")
+                    self._ser.reset_input_buffer()
+                    self._ser.reset_output_buffer()
+
+                    response = await self._send_command(Command.SKVER, expect_echo=True)
+
+                    if response and response.startswith("EVER"):
+                        return
+                except Exception:
+                    pass
+
+        raise Exception("No valid baudrate found.")
 
     async def scan(self, init_duration: int = 4) -> Optional[Epan]:
         duration = init_duration
@@ -110,16 +89,18 @@ class BP35A1:
         print("Scanning...")
 
         while duration <= 7:
-            command = f"SKSCAN 2 FFFFFFFF {duration}"
-            await self._send_command(command)
+            await self._send_command(
+                Command.SKSCAN,
+                ["2", "FFFFFFFF", str(duration)],
+            )
 
             try:
                 while True:
                     result = await asyncio.wait_for(self.get_next_result(), timeout=30)
-                    if isinstance(result, BP35A1.Epan):
+                    if isinstance(result, Epan):
                         epan = result
-                    elif isinstance(result, BP35A1.Event):
-                        if result.code == BP35A1.EventCode.ACTIVE_SCAN_OK:
+                    elif isinstance(result, Event):
+                        if result.code == EventCode.ACTIVE_SCAN_OK:
                             break
             except asyncio.TimeoutError:
                 pass
@@ -132,28 +113,23 @@ class BP35A1:
         return epan
 
     async def connect(self, epan: Epan) -> str:
-        command = f"SKSREG S2 {epan.channel:X}"
-        await self._send_command(command)
+        await self._send_command(Command.SKSREG, ["S2", f"{epan.channel:X}"])
+        await self._send_command(Command.SKSREG, ["S3", f"{epan.pan_id:X}"])
 
-        command = f"SKSREG S3 {epan.pan_id:X}"
-        await self._send_command(command)
-
-        command = f"SKLL64 {epan.mac_address}"
-        ip_address = await self._send_command(command)
+        ip_address = await self._send_command(Command.SKLL64, [epan.mac_address])
 
         print("Connecting...")
 
-        command = f"SKJOIN {ip_address}"
-        await self._send_command(command)
+        await self._send_command(Command.SKJOIN, [ip_address])
 
         try:
             while True:
                 result = await asyncio.wait_for(self.get_next_result(), timeout=30)
-                if isinstance(result, BP35A1.Event):
-                    if result.code == BP35A1.EventCode.PANA_CONNECT_OK:
+                if isinstance(result, Event):
+                    if result.code == EventCode.PANA_CONNECT_OK:
                         print(f"PANA connect OK {ip_address}")
                         return ip_address
-                    elif result.code == BP35A1.EventCode.PANA_CONNECT_ERROR:
+                    elif result.code == EventCode.PANA_CONNECT_ERROR:
                         raise PANAConnectError()
         except asyncio.TimeoutError:
             pass
@@ -169,35 +145,47 @@ class BP35A1:
         if self._udp_tx_allowed is False:
             raise TxProhibisionError()
 
-        command = f"SKSENDTO {handle} {ip_address} {port:04X} {1 if security else 2} {len(data):04X}"
-        await self._send_command(command, data)
+        params = [
+            f"{handle:X}",
+            ip_address,
+            f"{port:04X}",
+            "1" if security else "2",
+            f"{len(data):04X}",
+        ]
+
+        await self._send_command(Command.SKSENDTO, params, data)
 
     async def proc_rx(self):
-        buffer: bytes = b""
-
         while self._ser.is_open:
             data = await self._ser.read_async()
 
             if not data:
                 continue
-            buffer += data
 
-            if self._newline_code == self.NewLineCode.CRLF and buffer.endswith(b"\r\n"):
-                await self._process_line(buffer)
-                buffer = b""
-            elif self._newline_code == self.NewLineCode.CR and data == b"\r":
-                await self._process_line(buffer)
-                buffer = b""
+            async with self._buffer_lock:
+                self._buffer.extend(data)
+
+                if (
+                    self._newline_code == self.NewLineCode.CRLF
+                    and self._buffer.endswith(b"\r\n")
+                ) or (
+                    self._newline_code == self.NewLineCode.CR
+                    and self._buffer.endswith(b"\r")
+                ):
+                    line = bytes(self._buffer)
+                    self._buffer.clear()
+
+                    asyncio.create_task(self._process_line(line))
 
     async def _process_line(self, data: bytes):
         # print(f"=> {data}")
         line = data.decode().strip()
 
         match self._rx_state:
-            case self.RxState.NORMAL:
+            case RxState.NORMAL:
                 if line.startswith("ERXUDP"):  # 4-1
                     datas = line.split(" ")
-                    rxdata = self.RxData(
+                    rxdata = RxData(
                         src_addr=datas[1],
                         dst_addr=datas[2],
                         src_port=int(datas[3], 16),
@@ -215,22 +203,20 @@ class BP35A1:
                 elif line == "ENEIGHBOR":  # 4-4
                     pass
                 elif line == "EPANDESC":  # 4-5
-                    self._rx_state = self.RxState.EPANDESC
-                    self._epan = BP35A1.Epan()
+                    self._rx_state = RxState.EPANDESC
+                    self._epan = Epan()
                 elif line == "EEDSCAN":  # 4-6
                     pass
                 elif line == "EPORT":  # 4-7
                     pass
                 elif line.startswith("EVENT"):  # 4-8
                     datas = line.split(" ")
-                    event = self.Event(
-                        code=BP35A1.EventCode(int(datas[1], 16)), sender=datas[2]
-                    )
+                    event = Event(code=EventCode(int(datas[1], 16)), sender=datas[2])
 
                     match event.code:
-                        case BP35A1.EventCode.PANA_CONNECT_OK:
+                        case EventCode.PANA_CONNECT_OK:
                             self._udp_tx_allowed = True
-                        case BP35A1.EventCode.SESITON_LIFETIME_EXPIRE:
+                        case EventCode.SESITON_LIFETIME_EXPIRE:
                             self._udp_tx_allowed = False
 
                     await self._event_queue.put(event)
@@ -238,7 +224,7 @@ class BP35A1:
                     await self._result_queue.put(line)
                 else:
                     await self._response_queue.put(line)
-            case self.RxState.EPANDESC:
+            case RxState.EPANDESC:
                 match = re.match(r"\s*(.+?):(.+)", line)
                 if match:
                     key, value = match.groups()
@@ -258,56 +244,92 @@ class BP35A1:
                         self._epan.pair_id = value
 
                     if self._epan.is_complete():
-                        self._rx_state = self.RxState.NORMAL
+                        self._rx_state = RxState.NORMAL
                         await self._event_queue.put(self._epan)
-            case self.RxState.SKLL64:
+            case RxState.SKLL64:
                 if not line.startswith("FAIL"):
                     await self._response_queue.put(line)
                     await self._result_queue.put("OK")
                 else:
                     await self._result_queue.put(line)
-                self._rx_state = self.RxState.NORMAL
-            case self.RxState.PRODUCT_CONFIG_READ:
+                self._rx_state = RxState.NORMAL
+            case RxState.PRODUCT_CONFIG_READ:
                 if line.startswith("OK"):
                     datas = line.split(" ", 1)
+                    if len(datas) != 2:
+                        raise ValueError(
+                            "Invalid response. Must be a space-separated string"
+                        )
                     await self._response_queue.put(datas[1])
                     await self._result_queue.put(datas[0])
                 else:
                     await self._result_queue.put(line)
-                self._rx_state = self.RxState.NORMAL
+                self._rx_state = RxState.NORMAL
 
-    async def _send_command(self, command: str, data: bytes = None) -> str:
+    async def _send_command(
+        self,
+        command: Command,
+        params: list[str] = [],
+        data: bytes = None,
+        timeout: float = 1,
+        expect_echo: bool = False,
+    ) -> Optional[str]:
         self._result_queue = Queue()
         self._response_queue = Queue()
 
-        if command.startswith(("WOPT", "WUART", "ROPT", "RUART")):
+        if command in {Command.WOPT, Command.WUART, Command.ROPT, Command.RUART}:
             self._newline_code = self.NewLineCode.CR
-            if command.startswith(("ROPT", "RUART")):
-                self._rx_state = self.RxState.PRODUCT_CONFIG_READ
+            if command in {Command.ROPT, Command.RUART}:
+                self._rx_state = RxState.PRODUCT_CONFIG_READ
         else:
             self._newline_code = self.NewLineCode.CRLF
 
-        if command.startswith("SKLL64"):
-            self._rx_state = self.RxState.SKLL64
+        if command == Command.SKLL64:
+            self._rx_state = RxState.SKLL64
+
+        param_str = f" {' '.join(params)}" if params else ""
+
+        send_data = f"{command.value}{param_str}".encode()
 
         if data:
-            send_data = command.encode() + b" " + data + self._newline_code.encode()
-        else:
-            send_data = (command + self._newline_code).encode()
+            send_data += b" " + data
 
+        send_data += self._newline_code.encode()
+
+        await self._ser.write_async(send_data)
         # print(f"<= {send_data}")
-        self._ser.write(send_data)
 
-        result = await self._result_queue.get()
-        if result.startswith("FAIL"):
-            error_code = result[5:].strip() if len(result) > 5 else ""
-            raise CommandError(error_code)
+        try:
+            if expect_echo:
+                await self._skip_echo(command)
 
-        response_lines = []
-        while not self._response_queue.empty():
-            response_lines.append(await self._response_queue.get())
+            result = await asyncio.wait_for(self._result_queue.get(), timeout=timeout)
 
-        return "\r\n".join(response_lines)
+            if result.startswith("FAIL"):
+                error_code = result[5:].strip() if len(result) > 5 else ""
+                raise CommandError(error_code)
+
+            response_lines = []
+            while not self._response_queue.empty():
+                response_lines.append(await self._response_queue.get())
+
+            return "\r\n".join(response_lines) if response_lines else None
+        except asyncio.TimeoutError:
+            raise Exception("Result wait timeout")
+
+    async def _skip_echo(self, command: str):
+        try:
+            response = await asyncio.wait_for(self._response_queue.get(), 1)
+            if response == command:
+                return
+
+            await self._response_queue.put(response)
+        except asyncio.TimeoutError:
+            pass
 
     async def get_next_result(self):
         return await self._event_queue.get()
+
+    async def clear_buffer(self):
+        async with self._buffer_lock:
+            self._buffer.clear()

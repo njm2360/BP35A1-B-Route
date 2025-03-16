@@ -4,6 +4,7 @@ import traceback
 from dotenv import load_dotenv
 
 from app.bp35a1.bp35a1 import BP35A1
+from app.bp35a1.event import Epan, Event, EventCode, RxData
 from app.echonet.classcode import ClassCode, ClassGroupCode
 
 from app.echonet.echonet import ECHONET_LITE_PORT, ProtocolTx, ProtocolRx
@@ -32,7 +33,7 @@ async def main_task(bp35a1: BP35A1):
     await bp35a1.init(RB_ID, RB_PASSWORD)
 
     if os.path.exists(EPAN_DATA_JSON):
-        epan = BP35A1.Epan.from_json(file_path=EPAN_DATA_JSON)
+        epan = Epan.from_json(file_path=EPAN_DATA_JSON)
     else:
         epan = await bp35a1.scan(init_duration=6)
         if epan is None:
@@ -45,7 +46,9 @@ async def main_task(bp35a1: BP35A1):
     while sm_enet_obj is None:
         result = await bp35a1.get_next_result()
 
-        if isinstance(result, BP35A1.RxData):
+        if isinstance(result, RxData):
+            if result.dst_port != ECHONET_LITE_PORT:
+                break
             receive_data = ProtocolRx.proc(data=result.data)
             for property in receive_data.properties:
                 if isinstance(property, NodeProfile.InstanceListNotify):
@@ -62,7 +65,9 @@ async def main_task(bp35a1: BP35A1):
     while True:
         result = await bp35a1.get_next_result()
 
-        if isinstance(result, BP35A1.RxData):
+        if isinstance(result, RxData):
+            if result.dst_port != ECHONET_LITE_PORT:
+                break
             receive_data = ProtocolRx.proc(data=result.data)
             for property in receive_data.properties:
                 print(property)
@@ -71,8 +76,8 @@ async def main_task(bp35a1: BP35A1):
                     data = protocolTx.make()
                     await bp35a1.send_udp(pan_ip_address, ECHONET_LITE_PORT, data)
 
-        elif isinstance(result, BP35A1.Event):
-            if result.code != BP35A1.EventCode.UDP_SEND_OK:
+        elif isinstance(result, Event):
+            if result.code != EventCode.UDP_SEND_OK:
                 print(result)
 
 
