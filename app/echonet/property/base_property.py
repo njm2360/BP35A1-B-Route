@@ -14,12 +14,12 @@ class BaseProperty:
     class OpStatus(Property):
         """動作状態(0x80)"""
 
-        status: Optional[bool] = None
+        status: bool = True
         """状態"""
 
         def __post_init__(self):
             self.code = 0x80
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.OpStatus":
@@ -29,14 +29,8 @@ class BaseProperty:
                 )
             return cls(status=data[0] == 0x30)
 
-        def encode(self, mode: Access, simulate: bool = False) -> list[int]:
-            if mode == Access.GET or simulate:
-                return []
-
-            if mode == Access.SET:
-                return [0x30 if self.status else 0x31]
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">B", 0x30 if self.status else 0x31)
 
     @dataclass
     class InstallLocation(Property):
@@ -53,7 +47,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x81
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
             if isinstance(self.location_code, SpecialLocationCode):
                 self._location = self.location_code.value
@@ -101,35 +95,32 @@ class BaseProperty:
                     free_defined=free_defined,
                 )
 
-        def encode(self, mode: Access) -> list[int]:
-            result: list[int] = []
+        def encode(self) -> bytes:
+            result = bytearray()
 
-            if mode == Access.GET:
-                return []
+            if (
+                self.location_code == SpecialLocationCode.POSITION_INFORMATION
+                and self.position_information
+            ):
+                result.append(self.location_code.value)
+                result.extend(self.position_information)
             else:
-                if (
-                    self.location_code == SpecialLocationCode.POSITION_INFORMATION
-                    and self.position_information
-                ):
-                    result.append(self.location_code.value)
-                    result.extend(self.position_information)
-                else:
-                    result.append(self._location & 0xFF)
+                result.append(self._location & 0xFF)
 
-            return result
+            return bytes(result)
 
     @dataclass
     class VersionInfo(Property):
         """規格Version情報(0x82)"""
 
-        release: Optional[str] = None
+        release: str = "A"
         """リリース"""
-        rev_no: Optional[int] = None
+        rev_no: int = 0
         """リビジョン番号"""
 
         def __post_init__(self):
             self.code = 0x82
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.VersionInfo":
@@ -143,11 +134,8 @@ class BaseProperty:
 
             return cls(release, rev_no)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">BBcB", 0, 0, self.release.encode(), self.rev_no)
 
     @dataclass
     class IdentifierNo(Property):
@@ -158,28 +146,25 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x83
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes):
             raise NotImplementedError()
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            else:
-                raise NotImplementedError()
+        def encode(self) -> bytes:
+            raise NotImplementedError()
 
     @dataclass
     class InstantPowerConsumption(Property):
         """瞬時消費電力計測値(0x84)"""
 
-        value: Optional[int] = None
+        value: int = 0
         """計測値(W)"""
 
         def __post_init__(self):
             self.code = 0x84
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.InstantPowerConsumption":
@@ -191,22 +176,19 @@ class BaseProperty:
             value = struct.unpack(">I", data)[0]
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">I", self.value)
 
     @dataclass
     class CumulativePowerConsumption(Property):
         """積算消費電力量計測値(0x85)"""
 
-        value: Optional[float] = None
+        value: float = 0.0
         """計測値(kWh)"""
 
         def __post_init__(self):
             self.code = 0x85
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.CumulativePowerConsumption":
@@ -218,11 +200,8 @@ class BaseProperty:
             value = struct.unpack(">I", data)[0] / 1000.0
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">I", int(self.value * 1000))
 
     @dataclass
     class ManufacturerErrorCode(Property):
@@ -237,7 +216,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x86
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.ManufacturerErrorCode":
@@ -252,22 +231,24 @@ class BaseProperty:
 
             return cls(size, manufactor_code, error_code)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            size_data = struct.pack(">B", self.size if self.size is not None else 0)
+            manufactor_code_data = (
+                self.manufactor_code if self.manufactor_code is not None else 0
+            ).to_bytes(3, byteorder="big")
+            error_code_data = self.error_code if self.error_code is not None else b""
+            return size_data + manufactor_code_data + error_code_data
 
     @dataclass
     class CurrentLimitSetting(Property):
         """電流制限設定(0x87)"""
 
-        value: Optional[int] = None
+        value: int = 100
         """設定値(%)"""
 
         def __post_init__(self):
             self.code = 0x87
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.CurrentLimitSetting":
@@ -279,22 +260,21 @@ class BaseProperty:
             value = data[0]
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            if not (0 <= self.value <= 100):
+                raise ValueError("Value must be between 0 and 100.")
+            return struct.pack(">B", self.value)
 
     @dataclass
     class AbnormalState(Property):
         """異常発生状態(0x88)"""
 
-        abnormal: Optional[bool] = None
+        abnormal: bool = False
         """異常状態"""
 
         def __post_init__(self):
             self.code = 0x88
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.AbnormalState":
@@ -306,22 +286,19 @@ class BaseProperty:
             abnormal = data[0] == 0x41
             return cls(abnormal)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">B", 0x41 if self.abnormal else 0x42)
 
     @dataclass
     class MemberID(Property):
         """会員ID／メーカコード(0x8A)"""
 
-        manufactor_code: Optional[int] = None
+        manufactor_code: int = 0xFFFFFF
         """コード"""
 
         def __post_init__(self):
             self.code = 0x8A
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.MemberID":
@@ -333,11 +310,8 @@ class BaseProperty:
             manufactor_code = int.from_bytes(data, byteorder="big")
             return cls(manufactor_code)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return self.manufactor_code.to_bytes(3, byteorder="big")
 
     @dataclass
     class BusinessCode(Property):
@@ -348,7 +322,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x8B
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.BusinessCode":
@@ -360,11 +334,8 @@ class BaseProperty:
             business_code = int.from_bytes(data, byteorder="big")
             return cls(business_code)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return (self.business_code or 0).to_bytes(3, byteorder="big")
 
     @dataclass
     class ProductCode(Property):
@@ -375,7 +346,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x8C
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.ProductCode":
@@ -387,22 +358,19 @@ class BaseProperty:
             product_code = data.decode("ascii").strip("\x00 ")
             return cls(product_code)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return self.product_code.ljust(12, "\x00").encode("ascii")
 
     @dataclass
     class SerialNumber(Property):
         """製造番号(0x8D)"""
 
-        value: Optional[str] = None
+        value: str = ""
         """コード"""
 
         def __post_init__(self):
             self.code = 0x8D
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.SerialNumber":
@@ -414,22 +382,19 @@ class BaseProperty:
             value = data.decode("ascii").strip("\x00 ")
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return self.value.ljust(12, "\x00").encode("ascii")
 
     @dataclass
     class ManufactureDate(Property):
         """製造年月日(0x8E)"""
 
-        value: Optional[datetime] = None
+        value: date = date(2000, 1, 1)
         """製造年月日"""
 
         def __post_init__(self):
             self.code = 0x8E
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.ManufactureDate":
@@ -440,13 +405,12 @@ class BaseProperty:
 
             year, month, day = struct.unpack(">HBB", data)
 
-            return cls(value=datetime(year, month, day))
+            return cls(value=date(year, month, day))
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(
+                ">HBB", self.value.year, self.value.month, self.value.day
+            )
 
     @dataclass
     class PowerSavingMode(Property):
@@ -456,12 +420,12 @@ class BaseProperty:
             POWER_SAVE_OP = 0x41  # 節電動作中
             NORMAL_OP = 0x42  # 通常動作中
 
-        state: Optional[State] = None
+        state: State = State.NORMAL_OP
         """状態"""
 
         def __post_init__(self):
             self.code = 0x8F
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.PowerSavingMode":
@@ -473,15 +437,8 @@ class BaseProperty:
             state = cls.State(data[0])
             return cls(state)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            elif mode == Access.SET:
-                if self.state is None:
-                    raise ValueError("State must be set before encoding for SET mode")
-                return [self.state.value]
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">B", self.state.value)
 
     @dataclass
     class RemoteControlSetting(Property):
@@ -498,7 +455,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x93
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.RemoteControlSetting":
@@ -510,26 +467,21 @@ class BaseProperty:
             state = cls.State(data[0])
             return cls(state)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            elif mode == Access.SET:
-                if self.state is None:
-                    raise ValueError("State must be set before encoding for SET mode")
-                return [self.state.value]
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            if self.state is None:
+                raise ValueError("State must be set before encoding for SET mode")
+            return struct.pack(">B", self.state.value if self.state else 0x00)
 
     @dataclass
     class CurrentTime(Property):
         """現在時刻設定(0x97)"""
 
-        value: Optional[time] = None
-        """値"""
+        value: time = time(0, 0)
+        """時刻"""
 
         def __post_init__(self):
             self.code = 0x97
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.CurrentTime":
@@ -541,26 +493,19 @@ class BaseProperty:
             value = time(data[0], data[1])
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            elif mode == Access.SET:
-                if self.value is None:
-                    raise ValueError("Value must be set before encoding for SET mode")
-                return [self.value.hour, self.value.minute]
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">BB", self.value.hour, self.value.minute)
 
     @dataclass
     class CurrentDate(Property):
         """現在年月日設定(0x98)"""
 
-        value: Optional[date] = None
-        """値"""
+        value: date = date(2000, 1, 1)
+        """日時"""
 
         def __post_init__(self):
             self.code = 0x98
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.CurrentDate":
@@ -572,18 +517,10 @@ class BaseProperty:
             value = date(int.from_bytes(data[0:2], byteorder="big"), data[2], data[3])
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            elif mode == Access.SET:
-                if self.value is None:
-                    raise ValueError("Value must be set before encoding for SET mode")
-                return (
-                    list(self.value.year.to_bytes(2, byteorder="big"))
-                    + [self.value.month, self.value.day]
-                )
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(
+                ">HBB", self.value.year, self.value.month, self.value.day
+            )
 
     @dataclass
     class PowerLimitSetting(Property):
@@ -594,7 +531,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x99
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.PowerLimitSetting":
@@ -606,15 +543,10 @@ class BaseProperty:
             value = int.from_bytes(data, byteorder="big")
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            elif mode == Access.SET:
-                if self.value is None:
-                    raise ValueError("Value must be set before encoding for SET mode")
-                return list(self.value.to_bytes(2, byteorder="big"))
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            if self.value is None:
+                raise ValueError("Value must be set before encoding.")
+            return struct.pack(">H", self.value)
 
     @dataclass
     class CumulativeOperatingTime(Property):
@@ -626,15 +558,15 @@ class BaseProperty:
             HOUR = 0x43
             DAY = 0x44
 
-        unit: Optional[Unit] = None
+        unit: Unit = Unit.HOUR
         """単位"""
 
-        value: Optional[int] = None
+        value: int = 0
         """積算運転時間"""
 
         def __post_init__(self):
             self.code = 0x9A
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.CumulativeOperatingTime":
@@ -647,18 +579,18 @@ class BaseProperty:
             value = int.from_bytes(data[1:5], byteorder="big")
             return cls(unit, value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">BI", self.unit.value, self.value)
 
     @dataclass
     class PropertyMap(Property):
-        count: int = 0
-        """プロパティ数"""
         epc_list: Optional[list[int]] = field(default_factory=list)
         """EPC一覧"""
+
+        @property
+        def count(self) -> int:
+            """プロパティ数"""
+            return len(self.epc_list)
 
         @classmethod
         def decode(cls, data: bytes) -> "BaseProperty.PropertyMap":
@@ -688,13 +620,21 @@ class BaseProperty:
                             epc = 0xF0 + byte_index - (bit_index * 0x10)
                             epc_list.append(epc)
 
-            return cls(count, sorted(epc_list))
+            return cls(sorted(epc_list))
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> bytes:
+            if self.count < 16:
+                return bytes([self.count] + self.epc_list)
+            else:
+                bitmap = [0x00] * 16
+                for epc in self.epc_list:
+                    if not 0x80 <= epc <= 0xFF:
+                        continue
 
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+                    byte_index = epc % 0x10
+                    bit_index = (epc >> 4) - 8
+                    bitmap[byte_index] |= 1 << bit_index
+                return bytes([self.count] + bitmap)
 
     @dataclass
     class SetMPropertyMap(PropertyMap):
@@ -702,7 +642,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x9B
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class GetMPropertyMap(PropertyMap):
@@ -710,7 +650,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x9C
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class ChangeAnnoPropertyMap(PropertyMap):
@@ -718,7 +658,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x9D
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class SetPropertyMap(PropertyMap):
@@ -726,7 +666,7 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x9E
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class GetPropertyMap(PropertyMap):
@@ -734,4 +674,4 @@ class BaseProperty:
 
         def __post_init__(self):
             self.code = 0x9F
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]

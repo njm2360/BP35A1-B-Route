@@ -8,7 +8,7 @@ from app.echonet.object.access import Access
 class Property(ABC):
     code: int = field(init=False, repr=False)
     """EPCコード"""
-    accessRules: list[Access] = field(init=False, repr=False)
+    access_rules: list[Access] = field(init=False, repr=False)
     """アクセスルール"""
 
     @abstractmethod
@@ -17,6 +17,6 @@ class Property(ABC):
         pass
 
     @abstractmethod
-    def encode(self, mode: Access) -> list[int]:
+    def encode(self) -> bytes:
         """エンコード(EDTのみ)"""
         pass

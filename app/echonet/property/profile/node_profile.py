@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.echonet.property.base_property import Property
 from app.echonet.object.access import Access
@@ -10,14 +10,14 @@ class NodeProfile:
     class InstanceListNotify(Property):
         """インスタンスリスト通知"""
 
-        count: int
+        count: int = 0
         """通報インスタンス数"""
-        enet_objs: list[EnetObject]
+        enet_objs: list[EnetObject] = field(default_factory=list)
         """ECHONETオブジェクトコード"""
 
         def __post_init__(self):
             self.code = 0xD5
-            self.accessRules = [Access.ANNO]
+            self.access_rules = [Access.ANNO]
 
         @classmethod
         def decode(cls, data: bytes) -> "NodeProfile.InstanceListNotify":
@@ -41,9 +41,9 @@ class NodeProfile:
 
             return cls(count, enet_objs)
 
-        def encode(self, mode: Access) -> list[int]:
-            data = [self.count]
+        def encode(self) -> bytes:
+            data = bytearray([self.count])
             for obj in self.enet_objs:
                 data.extend(obj.encode())
 
-            return data
+            return bytes(data)

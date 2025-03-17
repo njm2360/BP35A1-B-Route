@@ -13,14 +13,14 @@ class LowVoltageSmartPm:
     class BrouteIdentifyNo(Property):
         """B ルート識別番号(0xC0)"""
 
-        manufacture_code: Optional[int] = None
+        manufacture_code: int = 0
         """メーカーコード"""
         free_area: bytes = field(default_factory=lambda: bytes(12))
         """自由領域"""
 
         def __post_init__(self):
             self.code = 0xC0
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.BrouteIdentifyNo":
@@ -32,16 +32,18 @@ class LowVoltageSmartPm:
             free_area = data[4:16]
             return cls(manufacture_code, free_area)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            manufacture_code_data = (self.manufacture_code or 0).to_bytes(
+                3, byteorder="big"
+            )
+            free_area_data = self.free_area[:12].ljust(12, b"\x00")
+            return b"\x00" + manufacture_code_data + free_area_data
 
     @dataclass
     class OneMinuteCumulativeEnergy(Property):
         """1分積算電力量 (0xD0)"""
 
-        timestamp: Optional[datetime] = None
+        timestamp: datetime = datetime(2000, 1, 1, 0, 0, 0)
         """計測年月日"""
         forward_energy: Optional[int] = None
         """積算電力量計測値(正方向)"""
@@ -50,7 +52,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xD0
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.OneMinuteCumulativeEnergy":
@@ -69,21 +71,36 @@ class LowVoltageSmartPm:
 
             return cls(timestamp, forward_energy, reverse_energy)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            timestamp_data = struct.pack(
+                ">HBBBBB",
+                self.timestamp.year,
+                self.timestamp.month,
+                self.timestamp.day,
+                self.timestamp.hour,
+                self.timestamp.minute,
+                self.timestamp.second,
+            )
+
+            forward_energy_data = (
+                self.forward_energy if self.forward_energy is not None else 0xFFFFFFFE
+            ).to_bytes(4, byteorder="big")
+            reverse_energy_data = (
+                self.reverse_energy if self.reverse_energy is not None else 0xFFFFFFFE
+            ).to_bytes(4, byteorder="big")
+
+            return timestamp_data + forward_energy_data + reverse_energy_data
 
     @dataclass
     class Coefficient(Property):
         """係数(0xD3)"""
 
-        value: Optional[int] = None
+        value: int = 1
         """値"""
 
         def __post_init__(self):
             self.code = 0xD3
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.Coefficient":
@@ -93,21 +110,19 @@ class LowVoltageSmartPm:
                 )
             return cls(struct.unpack(">I", data)[0])
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">I", self.value)
 
     @dataclass
     class CumulativeEnergySignificantDigit(Property):
         """積算電力量有効桁数(0xD7)"""
 
-        value: Optional[int] = None
+        value: int = 6
         """桁数"""
 
         def __post_init__(self):
             self.code = 0xD7
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(
@@ -119,10 +134,8 @@ class LowVoltageSmartPm:
                 )
             return cls(data[0])
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">B", self.value)
 
     @dataclass
     class CumulativeEnergyMeasurement(Property):
@@ -141,10 +154,9 @@ class LowVoltageSmartPm:
             value = None if value == 0xFFFFFFFE else value
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            value = self.value if self.value is not None else 0xFFFFFFFE
+            return struct.pack(">I", value)
 
     @dataclass
     class CumulativeEnergyMeasurementNormalDir(CumulativeEnergyMeasurement):
@@ -152,7 +164,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE0
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class CumulativeEnergyUnit(Property):
@@ -169,12 +181,12 @@ class LowVoltageSmartPm:
             UNIT_1000KWH = 0x0C  # 1000kWh
             UNIT_10000KWH = 0x0D  # 10000kWh
 
-        unit: Optional[Unit] = None
+        unit: Unit = Unit.UNIT_0_1KWH
         """単位"""
 
         def __post_init__(self):
             self.code = 0xE1
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.CumulativeEnergyUnit":
@@ -184,16 +196,14 @@ class LowVoltageSmartPm:
                 )
             return cls(cls.Unit(data[0]))
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            return struct.pack(">B", self.unit.value)
 
     @dataclass
     class CumulativeEnergyMeasurementHistory1(Property):
         """積算電力量計測値履歴１ 基底クラス (0xE2, 0xE4)"""
 
-        collect_day: Optional[int] = None
+        collect_day: int = 0
         """積算履歴収集日(0~99)"""
         values: List[int] = field(default_factory=list)
         """計測値(kWh)"""
@@ -211,10 +221,13 @@ class LowVoltageSmartPm:
             values = [None if v == 0xFFFFFFFE else v for v in raw_values]
             return cls(collect_day, values)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            collect_day_data = struct.pack(">H", self.collect_day)
+            values_data = b"".join(
+                struct.pack(">I", v if v is not None else 0xFFFFFFFE)
+                for v in self.values
+            )
+            return collect_day_data + values_data
 
     @dataclass
     class CumulativeEnergyMeasurementHistory1NormalDir(
@@ -224,7 +237,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE2
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class CumulativeEnergyMeasurementReverseDir(CumulativeEnergyMeasurement):
@@ -232,7 +245,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE3
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class CumulativeEnergyMeasurementHistory1ReverseDir(
@@ -242,7 +255,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE4
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class CumulativeHistoryCollectDay1(Property):
@@ -253,7 +266,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE5
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(
@@ -265,12 +278,10 @@ class LowVoltageSmartPm:
                 )
             return cls(data[0] if data[0] != 0xFF else None)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> bytes:
             if self.collect_day is None or not 0 <= self.collect_day <= 99:
                 raise ValueError("Day must be between 0 and 99.")
-            return [self.collect_day]
+            return struct.pack(">B", self.collect_day)
 
     @dataclass
     class MomentPower(Property):
@@ -281,7 +292,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE7
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.MomentPower":
@@ -293,10 +304,9 @@ class LowVoltageSmartPm:
             value = None if value == 0x7FFFFFFE else value
             return cls(value)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            value = self.value if self.value is not None else 0x7FFFFFFE
+            return struct.pack(">I", value)
 
     @dataclass
     class MomentCurrent(Property):
@@ -309,7 +319,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xE8
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(cls, data: bytes) -> "LowVoltageSmartPm.MomentCurrent":
@@ -324,11 +334,15 @@ class LowVoltageSmartPm:
 
             return cls(r_phase / 10, t_phase / 10)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> bytes:
+            r_phase_value = (
+                int(self.r_phase * 10) if self.r_phase is not None else 0x7FFE
+            )
+            t_phase_value = (
+                int(self.t_phase * 10) if self.t_phase is not None else 0x7FFE
+            )
 
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+            return struct.pack(">HH", r_phase_value, t_phase_value)
 
     @dataclass
     class IntCumulativeEnergyMeasurement(Property):
@@ -354,13 +368,27 @@ class LowVoltageSmartPm:
             power = None if power == 0xFFFFFFFE else power
             return cls(timestamp, power)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> list[int]:
+            if self.timestamp is None:
+                timestamp = datetime.now()
             else:
-                raise NotImplementedError(
-                    f"Encoding for mode {mode} is not implemented"
-                )
+                timestamp = self.timestamp
+
+            if self.value is None:
+                value = 0xFFFFFFFE
+            else:
+                value = self.value
+
+            return struct.pack(
+                ">HBBBBBI",
+                timestamp.year,
+                timestamp.month,
+                timestamp.day,
+                timestamp.hour,
+                timestamp.minute,
+                timestamp.second,
+                value,
+            )
 
     @dataclass
     class IntCumulativeEnergyNormalDir(IntCumulativeEnergyMeasurement):
@@ -368,7 +396,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xEA
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class IntCumulativeEnergyReverseDir(IntCumulativeEnergyMeasurement):
@@ -376,7 +404,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xEB
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
     @dataclass
     class CumulativeEnergyMeasurementHistory2(Property):
@@ -391,7 +419,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xEC
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(
@@ -441,10 +469,30 @@ class LowVoltageSmartPm:
 
             return cls(timestamp, record_count, records)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+        def encode(self) -> bytes:
+            if self.timestamp is None:
+                timestamp_data = struct.pack(">HBBBB", 0xFFFF, 0xFF, 0xFF, 0xFF, 0xFF)
+            else:
+                timestamp_data = struct.pack(
+                    ">HBBBB",
+                    self.timestamp.year,
+                    self.timestamp.month,
+                    self.timestamp.day,
+                    self.timestamp.hour,
+                    self.timestamp.minute,
+                )
+
+            record_count_data = struct.pack(">B", self.record_count or 0)
+            records_data = b"".join(
+                struct.pack(
+                    ">II",
+                    rec[0] if rec[0] is not None else 0xFFFFFFFE,
+                    rec[1] if rec[1] is not None else 0xFFFFFFFE,
+                )
+                for rec in self.energy_records
+            )
+
+            return timestamp_data + record_count_data + records_data
 
     @dataclass
     class CumulativeHistoryCollectDay2(Property):
@@ -457,7 +505,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xED
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(
@@ -525,7 +573,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xEE
-            self.accessRules = [Access.GET]
+            self.access_rules = [Access.GET]
 
         @classmethod
         def decode(
@@ -575,11 +623,30 @@ class LowVoltageSmartPm:
 
             return cls(timestamp, record_count, records)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> bytes:
+            if self.timestamp is None:
+                timestamp_data = struct.pack(">HBBBB", 0xFFFF, 0xFF, 0xFF, 0xFF, 0xFF)
+            else:
+                timestamp_data = struct.pack(
+                    ">HBBBB",
+                    self.timestamp.year,
+                    self.timestamp.month,
+                    self.timestamp.day,
+                    self.timestamp.hour,
+                    self.timestamp.minute,
+                )
 
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+            record_count_data = struct.pack(">B", self.record_count or 0)
+            records_data = b"".join(
+                struct.pack(
+                    ">II",
+                    rec[0] if rec[0] is not None else 0xFFFFFFFE,
+                    rec[1] if rec[1] is not None else 0xFFFFFFFE,
+                )
+                for rec in self.energy_records
+            )
+
+            return timestamp_data + record_count_data + records_data
 
     @dataclass
     class CumulativeHistoryCollectDay3(Property):
@@ -592,7 +659,7 @@ class LowVoltageSmartPm:
 
         def __post_init__(self):
             self.code = 0xEF
-            self.accessRules = [Access.GET, Access.SET]
+            self.access_rules = [Access.GET, Access.SET]
 
         @classmethod
         def decode(
@@ -619,28 +686,18 @@ class LowVoltageSmartPm:
 
             return cls(timestamp, collect_count)
 
-        def encode(self, mode: Access) -> list[int]:
-            if mode == Access.GET:
-                return []
+        def encode(self) -> bytes:
+            if self.timestamp is None or self.collect_count is None:
+                raise ValueError("Timestamp and record count must be set for encoding.")
+            if not (1 <= self.collect_count <= 10):
+                raise ValueError("Record count must be between 1 and 10.")
 
-            if mode == Access.SET:
-                if self.timestamp is None or self.collect_count is None:
-                    raise ValueError(
-                        "Timestamp and record count must be set for encoding."
-                    )
-                if not (1 <= self.collect_count <= 10):
-                    raise ValueError("Record count must be between 1 and 10.")
-
-                return list(
-                    struct.pack(
-                        ">HBBBBB",
-                        self.timestamp.year,
-                        self.timestamp.month,
-                        self.timestamp.day,
-                        self.timestamp.hour,
-                        self.timestamp.minute,
-                        self.collect_count,
-                    )
-                )
-
-            raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
+            return struct.pack(
+                ">HBBBBB",
+                self.timestamp.year,
+                self.timestamp.month,
+                self.timestamp.day,
+                self.timestamp.hour,
+                self.timestamp.minute,
+                self.collect_count,
+            )
