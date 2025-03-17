@@ -10,25 +10,6 @@ from app.echonet.protocol.tid import TransactionId
 
 
 class ProtocolTx:
-    ESV_ACCESS_RULES = {
-        EnetService.SetI: [Access.SET],
-        EnetService.SetC: [Access.SET],
-        EnetService.Get: [Access.GET],
-        EnetService.Inf_Req: [Access.ANNO],
-        EnetService.SetGet: [Access.SET, Access.GET],
-        EnetService.SetRes: [Access.SET],
-        EnetService.GetRes: [Access.GET],
-        EnetService.Inf: [Access.ANNO],
-        EnetService.InfC: [Access.ANNO],
-        EnetService.InfcRes: [Access.ANNO],
-        EnetService.SetGetRes: [Access.SET, Access.GET],
-        EnetService.SetI_Sna: [Access.SET],
-        EnetService.SetC_Sna: [Access.SET],
-        EnetService.Get_Sna: [Access.GET],
-        EnetService.Inf_Sna: [Access.ANNO],
-        EnetService.SetGet_Sna: [Access.SET, Access.GET],
-    }
-
     def __init__(
         self,
         enet_object_header: EnetObjectHeader,
@@ -42,19 +23,10 @@ class ProtocolTx:
         self._enet_object_header = enet_object_header
         self._enet_service = enet_service
         self._properties: deque[Property] = deque()
-        self._limitAccessRules = self.ESV_ACCESS_RULES.get(self._enet_service, [])
-        self._encode_mode = (
-            Access.GET if Access.GET in self._limitAccessRules else Access.SET
-        )
         self._packet_size_limit = packet_size_limit
 
     def add_property(self, property: Property):
         # ToDo 通信仕様の理解がもっと必要、単純ではない
-
-        # if any(rule in self._limitAccessRules for rule in property.accessRules):
-        #     self._properties.append(property)
-        # else:
-        #     raise Exception("Access rule violation")
 
         self._properties.append(property)
 
@@ -63,9 +35,13 @@ class ProtocolTx:
 
         encoded_properties = []
         for prop in self._properties:
-            encoded_value = prop.encode(mode=self._encode_mode)
+            encoded_value = (
+                b""
+                if self._enet_service in {EnetService.Get, EnetService.Inf_Req}
+                else prop.encode()
+            )
             encoded_properties.append(
-                struct.pack("BB", prop.code, len(encoded_value)) + bytes(encoded_value)
+                struct.pack("BB", prop.code, len(encoded_value)) + encoded_value
             )
 
         current_properties = []

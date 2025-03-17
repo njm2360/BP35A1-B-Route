@@ -7,7 +7,7 @@ from app.echonet.protocol.esv import EnetService
 
 @dataclass(frozen=True)
 class EchonetData:
-    """ECHONET 送信データ"""
+    """ECHONETデータ"""
 
     src_enet_object: EnetObject
     """送信元ECHONETオブジェクト"""
