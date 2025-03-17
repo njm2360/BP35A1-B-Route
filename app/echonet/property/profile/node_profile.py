@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.echonet.property.base_property import Property
-from app.echonet.protocol.access import Access
+from app.echonet.object.access import Access
 from app.echonet.protocol.eoj import EnetObject, EnetObjectHeader
 
 
@@ -42,4 +42,8 @@ class NodeProfile:
             return cls(count, enet_objs)
 
         def encode(self, mode: Access) -> list[int]:
-            raise NotImplementedError()
+            data = [self.count]
+            for obj in self.enet_objs:
+                data.extend(obj.encode())
+
+            return data

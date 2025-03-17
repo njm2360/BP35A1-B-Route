@@ -43,8 +43,12 @@ class BP35A1:
         self._response_queue: Queue[str] = Queue()
 
         self._udp_tx_allowed: bool = False
+        self._rx_task = None
 
     async def init(self, id: str, password: str):
+        if self._rx_task is None:
+            self._rx_task = asyncio.create_task(self._proc_rx())
+
         await self._correct_baudrate()
 
         await self._send_command(Command.SKRESET, timeout=3, expect_echo=True)
@@ -155,7 +159,7 @@ class BP35A1:
 
         await self._send_command(Command.SKSENDTO, params, data)
 
-    async def proc_rx(self):
+    async def _proc_rx(self):
         while self._ser.is_open:
             data = await self._ser.read_async()
 

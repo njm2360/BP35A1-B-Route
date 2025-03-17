@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from app.echonet.protocol.access import Access
+from app.echonet.object.access import Access
 
 
 @dataclass
@@ -13,8 +13,10 @@ class Property(ABC):
 
     @abstractmethod
     def decode(self, data: bytes):
+        """デコード(EDTのみ)"""
         pass
 
     @abstractmethod
     def encode(self, mode: Access) -> list[int]:
+        """エンコード(EDTのみ)"""
         pass

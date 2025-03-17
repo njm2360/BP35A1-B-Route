@@ -1,16 +1,13 @@
-from datetime import datetime
 from dataclasses import dataclass
+from typing import Optional
 
 from app.echonet.protocol.eoj import EnetObject
 from app.echonet.protocol.esv import EnetService
 
 
 @dataclass(frozen=True)
-class EchonetReceiveData:
-    """ECHONET 受信データ"""
-
-    received_at: datetime
-    """受信日時"""
+class EchonetData:
+    """ECHONET 送信データ"""
 
     src_enet_object: EnetObject
     """送信元ECHONETオブジェクト"""
@@ -21,8 +18,8 @@ class EchonetReceiveData:
     enet_service: EnetService
     """ECHONETサービス"""
 
-    transaction_id: int
-    """トランザクションID"""
-
     properties: tuple[property]
     """ECHONETプロパティ"""
+
+    transaction_id: Optional[int] = None
+    """トランザクションID"""

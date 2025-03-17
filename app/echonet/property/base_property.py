@@ -4,7 +4,7 @@ from typing import Optional, Union
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 
-from app.echonet.protocol.access import Access
+from app.echonet.object.access import Access
 from app.echonet.property.property import Property
 from app.echonet.property.install_location import LocationCode, SpecialLocationCode
 
@@ -31,10 +31,10 @@ class BaseProperty:
 
         def encode(self, mode: Access, simulate: bool = False) -> list[int]:
             if mode == Access.GET or simulate:
-                return [self.code, 0x00]
+                return []
 
             if mode == Access.SET:
-                return [self.code, 0x01, 0x30 if self.status else 0x31]
+                return [0x30 if self.status else 0x31]
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -102,20 +102,18 @@ class BaseProperty:
                 )
 
         def encode(self, mode: Access) -> list[int]:
-            result: list[int] = [self.code]
+            result: list[int] = []
 
             if mode == Access.GET:
-                result.append(0x00)
+                return []
             else:
                 if (
                     self.location_code == SpecialLocationCode.POSITION_INFORMATION
                     and self.position_information
                 ):
-                    result.append(0x11)
                     result.append(self.location_code.value)
                     result.extend(self.position_information)
                 else:
-                    result.append(0x01)
                     result.append(self._location & 0xFF)
 
             return result
@@ -147,7 +145,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -167,14 +165,10 @@ class BaseProperty:
             raise NotImplementedError()
 
         def encode(self, mode: Access) -> list[int]:
-            result: list[int] = [self.code]
-
             if mode == Access.GET:
-                result.append(0x00)
+                return []
             else:
                 raise NotImplementedError()
-
-            return result
 
     @dataclass
     class InstantPowerConsumption(Property):
@@ -199,7 +193,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -226,7 +220,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -260,7 +254,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -287,7 +281,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -314,7 +308,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -341,7 +335,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -368,7 +362,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -395,7 +389,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -422,7 +416,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -450,7 +444,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -481,11 +475,11 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             elif mode == Access.SET:
                 if self.state is None:
                     raise ValueError("State must be set before encoding for SET mode")
-                return [self.code, 0x01, self.state.value]
+                return [self.state.value]
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -518,11 +512,11 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             elif mode == Access.SET:
                 if self.state is None:
                     raise ValueError("State must be set before encoding for SET mode")
-                return [self.code, 0x01, self.state.value]
+                return [self.state.value]
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -549,11 +543,11 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             elif mode == Access.SET:
                 if self.value is None:
                     raise ValueError("Value must be set before encoding for SET mode")
-                return [self.code, 0x02, self.value.hour, self.value.minute]
+                return [self.value.hour, self.value.minute]
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -580,13 +574,12 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             elif mode == Access.SET:
                 if self.value is None:
                     raise ValueError("Value must be set before encoding for SET mode")
                 return (
-                    [self.code, 0x04]
-                    + list(self.value.year.to_bytes(2, byteorder="big"))
+                    list(self.value.year.to_bytes(2, byteorder="big"))
                     + [self.value.month, self.value.day]
                 )
 
@@ -615,11 +608,11 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             elif mode == Access.SET:
                 if self.value is None:
                     raise ValueError("Value must be set before encoding for SET mode")
-                return [self.code, 0x02] + list(self.value.to_bytes(2, byteorder="big"))
+                return list(self.value.to_bytes(2, byteorder="big"))
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -656,7 +649,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -699,7 +692,7 @@ class BaseProperty:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 

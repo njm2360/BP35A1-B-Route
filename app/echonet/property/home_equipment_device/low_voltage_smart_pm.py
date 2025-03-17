@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
 
-from app.echonet.protocol.access import Access
+from app.echonet.object.access import Access
 from app.echonet.property.base_property import Property
 
 
@@ -34,7 +34,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -71,7 +71,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -95,7 +95,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -121,7 +121,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -143,7 +143,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -186,7 +186,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -213,7 +213,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -267,10 +267,10 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             if self.collect_day is None or not 0 <= self.collect_day <= 99:
                 raise ValueError("Day must be between 0 and 99.")
-            return [self.code, 0x01, self.collect_day]
+            return [self.collect_day]
 
     @dataclass
     class MomentPower(Property):
@@ -295,7 +295,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -326,7 +326,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -356,7 +356,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             else:
                 raise NotImplementedError(
                     f"Encoding for mode {mode} is not implemented"
@@ -443,7 +443,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
     @dataclass
@@ -486,7 +486,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             if mode == Access.SET:
                 if self.timestamp is None or self.collect_count is None:
@@ -498,7 +498,7 @@ class LowVoltageSmartPm:
                 if not (1 <= self.collect_count <= 12):
                     raise ValueError("Record count must be between 1 and 12.")
 
-                return [self.code, 0x07] + list(
+                return list(
                     struct.pack(
                         ">HBBBBB",
                         self.timestamp.year,
@@ -577,7 +577,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             raise NotImplementedError(f"Encoding for mode {mode} is not implemented")
 
@@ -621,7 +621,7 @@ class LowVoltageSmartPm:
 
         def encode(self, mode: Access) -> list[int]:
             if mode == Access.GET:
-                return [self.code, 0x00]
+                return []
 
             if mode == Access.SET:
                 if self.timestamp is None or self.collect_count is None:
@@ -631,7 +631,7 @@ class LowVoltageSmartPm:
                 if not (1 <= self.collect_count <= 10):
                     raise ValueError("Record count must be between 1 and 10.")
 
-                return [self.code, 0x07] + list(
+                return list(
                     struct.pack(
                         ">HBBBBB",
                         self.timestamp.year,
